@@ -9,6 +9,7 @@ from tokenteller.drivers.models.base import BaseModelDriver
 
 
 class FakeTokenizerDriver(BaseModelDriver):
+    # This fake tokenizer lets tests simulate a few tokenization styles.
     def __init__(self, name: str, mode: str = "word"):
         super().__init__(name=name)
         self.mode = mode
@@ -16,6 +17,7 @@ class FakeTokenizerDriver(BaseModelDriver):
         self._id_to_token: dict[int, str] = {}
 
     def encode(self, text: str) -> TokenizationResult:
+        # Character mode treats each non-space character as one token.
         if self.mode == "char":
             tokens = []
             offsets = []
@@ -24,6 +26,7 @@ class FakeTokenizerDriver(BaseModelDriver):
                     continue
                 tokens.append(char)
                 offsets.append((index, index + 1))
+        # Hybrid mode splits longer words into two pieces.
         elif self.mode == "hybrid":
             tokens = []
             offsets = []
@@ -39,6 +42,7 @@ class FakeTokenizerDriver(BaseModelDriver):
                     tokens.append(piece)
                     offsets.append((cursor, cursor + len(piece)))
                     cursor += len(piece)
+        # Word mode keeps each word intact.
         else:
             tokens = []
             offsets = []
@@ -46,6 +50,7 @@ class FakeTokenizerDriver(BaseModelDriver):
                 tokens.append(match.group(0))
                 offsets.append(match.span())
 
+        # Convert the token strings into stable fake token ids.
         token_ids = [self._get_id(token) for token in tokens]
         return TokenizationResult(
             token_ids=token_ids,
@@ -56,20 +61,14 @@ class FakeTokenizerDriver(BaseModelDriver):
         )
 
     def decode(self, token_ids: list[int]) -> str:
+        # Convert the fake token ids back into token strings.
         tokens = [self._id_to_token[token_id] for token_id in token_ids]
         if self.mode == "char":
             return "".join(tokens)
         return " ".join(tokens)
 
-    def info(self) -> dict[str, object]:
-        return {
-            "name": self.name,
-            "family": f"fake-{self.mode}",
-            "vocab_size": max(1, len(self._token_to_id)),
-            "supports_offsets": True,
-        }
-
     def _get_id(self, token: str) -> int:
+        # Assign a new integer id the first time a token is seen.
         if token not in self._token_to_id:
             token_id = len(self._token_to_id) + 1
             self._token_to_id[token] = token_id
@@ -78,12 +77,15 @@ class FakeTokenizerDriver(BaseModelDriver):
 
 
 class FakeDatasetDriver(BaseDatasetDriver):
+    # This fake dataset lets tests exercise filtering and sampling behavior.
     def __init__(self, name: str, records: list[DatasetRecord]):
         super().__init__(name=name)
         self.records = records
 
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        # Start from the full in-memory record list.
         records = self.records
+        # Apply simple equality filters from the query.
         for key, expected in query.filters.items():
             records = [
                 record
@@ -92,13 +94,16 @@ class FakeDatasetDriver(BaseDatasetDriver):
             ]
 
         if query.sample_strategy == "random":
+            # Random sampling is deterministic when a seed is given.
             import random
 
             records = records[:]
             random.Random(query.seed).shuffle(records)
         elif query.sample_strategy == "tail":
+            # Tail sampling reverses the order before limiting.
             records = records[::-1]
 
         if query.limit is None:
             return records
+        # Respect the requested record limit.
         return records[: query.limit]

@@ -1,4 +1,4 @@
-# Creating Drivers
+# Driver Guide
 
 Tokenteller is built around three kinds of drivers:
 
@@ -16,18 +16,25 @@ Each driver inherits from a base class near the drivers themselves:
 
 Start from `BaseModelDriver` when you want to support a new model tokenizer.
 
-You must implement:
+You must add:
 
 - `encode(text)`
 
-Optional helper:
+You may also add:
 
 - `decode(token_ids)`
 - `batch_encode(texts)`
 - `token_count(text)`
 - `fragmentation_stats(text)`
 
-Your `encode()` method should return a `TokenizationResult`. That object contains:
+Put any model-specific setup in the constructor, such as:
+
+- model path
+- checkpoint name
+- tokenizer options
+- remote loading flags
+
+`encode()` must return a `TokenizationResult`. Expected fields:
 
 - `token_ids`
 - `tokens`
@@ -35,26 +42,48 @@ Your `encode()` method should return a `TokenizationResult`. That object contain
 - `offsets`
 - `raw`
 
+Field meanings:
+
+- `token_ids`: integer ids in model order
+- `tokens`: readable token strings when available
+- `token_count`: usually `len(token_ids)`
+- `offsets`: optional `(start, end)` spans for each token
+- `raw`: optional extra library output
+
 Use the template in [models/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/template.py).
 
 ## Dataset Drivers
 
 Start from `BaseDatasetDriver` when you want to support a new dataset source.
 
-You must implement:
+You must add:
 
 - `iter_records(query)`
 
-Optional helpers:
+You may also add:
 
 - `count(query)`
 
-Your dataset should return `DatasetRecord` objects. Each record should include:
+Put any dataset-specific setup in the constructor, such as:
+
+- dataset path
+- split name
+- API client
+- preload settings
+
+`iter_records(query)` must yield `DatasetRecord` objects. Expected fields:
 
 - `id`
 - `text`
 - `categories`
 - `metadata`
+
+Field meanings:
+
+- `id`: stable record identifier
+- `text`: the text that will be tokenized
+- `categories`: simple grouping labels like language or domain
+- `metadata`: any extra information you want to keep
 
 Use `categories` for fields you want to group by later, such as:
 
@@ -68,13 +97,21 @@ Use the template in [datasets/template.py](D:/Development/School/asml/tokentelle
 
 Start from `BaseTestDriver` when you want to add a new metric or analysis.
 
-You must implement:
+You must add:
 
 - `name()`
 - `run_case(tokenizer, record, context)`
 
-You do not need to write your own parallel runner unless you want custom behavior. The base class already provides `run_batch()`.
-If you add your own `__init__()` to a test class, call `super().__init__(label=...)` first so the built-in status and result tracking still works.
+Put any test-specific setup in the constructor. If you add your own `__init__()`,
+call `super().__init__(label=...)` first so the built-in state tracking still works.
+
+`run_case(...)` should return a `TestCaseResult`. In practice:
+
+- `metrics` should hold the numeric or summary values you care about
+- `artifacts` can hold extra detail like token lists or spans
+
+The base class already provides `run_batch()`, result storage, text summaries,
+and a default `compare()` method.
 
 Each test object also stores:
 
@@ -88,26 +125,18 @@ You can also override `compare()` if it makes sense to compare two runs of the s
 
 Use the template in [testsuites/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/template.py).
 
-## Using A Driver
+## Constructor Parameters
 
-After writing a driver, instantiate it directly and pass the object into `Experiment`.
+The library does support whatever constructor parameters your driver needs.
+The experiment only receives finished driver objects, so parameter handling stays
+inside your driver classes.
 
-Model:
-
-```python
-model = MyModelDriver()
-```
-
-Dataset:
+Examples:
 
 ```python
-dataset = MyDatasetDriver()
-```
-
-Test:
-
-```python
-test = MyTestDriver()
+model = MyModelDriver(model_path="my-model", trust_remote_code=True)
+dataset = MyDatasetDriver(data_path="data.jsonl", split="train")
+test = MyTestDriver(label="Hindi prompts")
 ```
 
 ## Minimal Workflow
@@ -139,7 +168,7 @@ experiment.add_test(
 report = experiment.run()
 ```
 
-## Suggested Student Approach
+## Keep It Small
 
 For a class project, keep drivers small:
 

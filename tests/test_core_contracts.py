@@ -8,8 +8,10 @@ from .fakes import FakeDatasetDriver, FakeTokenizerDriver
 
 
 def test_tokenizer_helper_methods_work():
+    # Build a simple fake tokenizer for the helper-method checks.
     tokenizer = FakeTokenizerDriver("fake-word", mode="word")
 
+    # The shared model-driver helpers should delegate to encode() correctly.
     batch = tokenizer.batch_encode(["one two", "three"])
 
     assert [result.token_count for result in batch] == [2, 1]
@@ -20,6 +22,7 @@ def test_tokenizer_helper_methods_work():
 
 
 def test_dataset_driver_supports_filters_and_deterministic_sampling():
+    # Build a small mixed dataset for filter and sampling checks.
     dataset = FakeDatasetDriver(
         name="demo",
         records=[
@@ -29,7 +32,9 @@ def test_dataset_driver_supports_filters_and_deterministic_sampling():
         ],
     )
 
+    # Filtering should keep only the matching Hindi row.
     hindi = list(dataset.iter_records(DatasetQuery(filters={"language": "hi"})))
+    # Random sampling should repeat with the same seed.
     first_random = [record.id for record in dataset.iter_records(DatasetQuery(sample_strategy="random", seed=7))]
     second_random = [record.id for record in dataset.iter_records(DatasetQuery(sample_strategy="random", seed=7))]
 
@@ -38,6 +43,7 @@ def test_dataset_driver_supports_filters_and_deterministic_sampling():
 
 
 def test_direct_driver_instantiation_is_enough():
+    # The library should work with direct driver objects and no registry.
     tokenizer = FakeTokenizerDriver("direct-word", mode="word")
 
     assert tokenizer.name == "direct-word"
@@ -45,11 +51,13 @@ def test_direct_driver_instantiation_is_enough():
 
 
 def test_base_test_driver_parallel_batch_preserves_input_order():
+    # This fake test adds delays so futures finish out of order.
     class OrderedEchoTest(BaseTestDriver):
         def name(self) -> str:
             return "ordered_echo"
 
         def run_case(self, tokenizer, record, context):
+            # Delay two records to force out-of-order completion.
             import time
 
             if record.id == "1":
@@ -58,6 +66,7 @@ def test_base_test_driver_parallel_batch_preserves_input_order():
                 time.sleep(0.01)
             return TokenCountTest().run_case(tokenizer, record, context)
 
+    # The final result order should still match the input order.
     records = [
         DatasetRecord(id="1", text="alpha beta"),
         DatasetRecord(id="2", text="gamma"),

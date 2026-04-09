@@ -1,54 +1,88 @@
 # Tokenteller
 
-Tokenteller is a small Python toolkit for comparing tokenization behavior.
+Tokenteller is a small Python toolkit for building and running tokenizer experiments.
 
-This version does not ship with concrete model or dataset drivers. Instead, it
-provides:
+## Install
 
-- base classes for model, dataset, and test drivers
-- a small `Experiment` object
-- templates your teammates can fill in
-
-Example:
-
-```python
-from my_project.my_model_driver import MyModelDriver
-from my_project.my_dataset_driver import MyDatasetDriver
-from tokenteller import Experiment
-from tokenteller.testsuites.metrics import FragmentationTest, TokenCountTest
-
-experiment = Experiment()
-experiment.add_model(MyModelDriver(), name="my_model")
-experiment.add_dataset(MyDatasetDriver(), name="my_dataset")
-experiment.add_test(TokenCountTest(), model="my_model", dataset="my_dataset")
-experiment.add_test(FragmentationTest(), model="my_model", dataset="my_dataset")
-
-report = experiment.run()
-
-print(report.summary_table())
-```
-
-Setup:
+Install the package in editable mode while you work on the project.
 
 ```bash
 pip install -e .
 ```
 
-## Project Notes
+## Create An Experiment
 
-This version is intentionally kept classroom-friendly:
+Build your model and dataset driver objects first, then add them to an `Experiment`.
 
-- the public API is small
-- the main workflow is `add_model()`, `add_dataset()`, `add_test()`, then `run()`
-- models, datasets, and tests are passed around as normal Python objects
-- new model/tokenizer drivers only need `encode()`
-- new dataset drivers only need `iter_records()`
-- built-in metrics are short and readable
-- concrete model and dataset drivers are left for your teammates to implement
+```python
+from my_project.my_dataset_driver import MyDatasetDriver
+from my_project.my_model_driver import MyModelDriver
+from tokenteller import Experiment
+from tokenteller.core.types import DatasetQuery, RunConfig
+from tokenteller.testsuites.metrics import FragmentationTest, TokenCountTest
 
-Driver templates and extension notes:
+model = MyModelDriver(model_path="my-model")
+dataset = MyDatasetDriver(data_path="my-data.jsonl")
+
+experiment = Experiment(
+    run_config=RunConfig(max_workers=4, baseline_tokenizer="my_model"),
+)
+
+experiment.add_model(model, name="my_model")
+experiment.add_dataset(dataset, name="my_dataset")
+
+experiment.add_test(
+    TokenCountTest(label="english token count"),
+    model="my_model",
+    dataset="my_dataset",
+    query=DatasetQuery(filters={"language": "en"}, limit=50),
+)
+experiment.add_test(
+    FragmentationTest(label="english fragmentation"),
+    model="my_model",
+    dataset="my_dataset",
+    query=DatasetQuery(filters={"language": "en"}, limit=50),
+)
+```
+
+## Run An Experiment
+
+Call `run()` after all models, datasets, and tests have been added.
+
+```python
+report = experiment.run()
+```
+
+## View Experiment Data
+
+Use the report for experiment-wide output.
+
+```python
+print(report.summary_table())
+print(report.summary)
+print(report.results)
+print(report.warnings)
+```
+
+Use the saved test objects for per-test output.
+
+```python
+test = experiment.tests[0]
+
+print(test.status)
+print(test.summary_table())
+print(test.results)
+print(test.warnings)
+```
+
+If two tests are the same type, you can compare them.
+
+```python
+print(experiment.tests[0].compare(experiment.tests[1]))
+```
+
+## Driver Instructions
+
+Driver-writing instructions live here:
 
 - [docs/creating_drivers.md](D:/Development/School/asml/tokenteller/docs/creating_drivers.md)
-- [models/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/template.py)
-- [datasets/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/template.py)
-- [testsuites/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/template.py)

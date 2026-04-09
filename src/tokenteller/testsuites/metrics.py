@@ -9,6 +9,7 @@ class TokenCountTest(BaseTestDriver):
     """Count how many tokens a tokenizer creates for a piece of text."""
 
     def name(self) -> str:
+        # Return the stable test name used in summaries.
         return "token_count"
 
     def run_case(
@@ -32,6 +33,7 @@ class FragmentationTest(BaseTestDriver):
     """Measure how much a tokenizer splits words into smaller pieces."""
 
     def name(self) -> str:
+        # Return the stable test name used in summaries.
         return "fragmentation"
 
     def run_case(
@@ -61,6 +63,7 @@ class NSLTest(BaseTestDriver):
     """Compare token count to the baseline tokenizer for the same record."""
 
     def name(self) -> str:
+        # Return the stable test name used in summaries.
         return "nsl"
 
     def run_case(
@@ -73,9 +76,11 @@ class NSLTest(BaseTestDriver):
         tokenization = context.get_tokenization(tokenizer, record)
         baseline_count = context.baseline_token_counts.get(record.id)
         if not baseline_count:
+            # Without baseline data, the ratio cannot be computed.
             context.add_warning(f"Missing baseline token count for record '{record.id}'.")
             nsl = None
         else:
+            # Compare this token count to the baseline token count.
             nsl = tokenization.token_count / baseline_count
         return TestCaseResult(
             record_id=record.id,
@@ -94,6 +99,7 @@ class CostEstimateTest(BaseTestDriver):
     """Very simple estimated cost based on a user-supplied cost per 1k tokens."""
 
     def name(self) -> str:
+        # Return the stable test name used in summaries.
         return "cost"
 
     def run_case(
@@ -104,7 +110,9 @@ class CostEstimateTest(BaseTestDriver):
     ) -> TestCaseResult:
         # This is intentionally simple and meant for comparison, not billing.
         tokenization = context.get_tokenization(tokenizer, record)
+        # Look up the configured cost rate for this model.
         cost_per_1k = context.run_config.cost_per_1k_tokens.get(tokenizer.name, 0.0)
+        # Turn a token count into a rough estimated cost.
         estimated_cost = tokenization.token_count / 1000.0 * cost_per_1k
         return TestCaseResult(
             record_id=record.id,
