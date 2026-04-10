@@ -14,27 +14,23 @@ class ModelDriverTemplate(BaseModelDriver):
     """
 
     def __init__(self, name: str = "my_model"):
+        # Save the short model name used in experiment summaries.
         super().__init__(name=name)
-        # TODO: load or store the tokenizer/model object here
+        # TODO: load the real tokenizer object here
 
     def encode(self, text: str) -> TokenizationResult:
-        # TODO: tokenize the input string
+        # TODO: turn the input string into token ids and token strings
         token_ids = []
         tokens = []
-        offsets = []
 
         return TokenizationResult(
             token_ids=token_ids,
             tokens=tokens,
             token_count=len(token_ids),
-            offsets=offsets,
+            offsets=None,
             raw={},
         )
 
     def decode(self, token_ids: list[int]) -> str:
-        # TODO: convert token ids back into text
+        # TODO: convert token ids back into text if your library supports it
         return ""
-
-    def info(self) -> dict[str, object]:
-        # Optional: return extra information about the model/tokenizer
-        return {"name": self.name}

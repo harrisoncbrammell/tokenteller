@@ -1,150 +1,167 @@
 # Driver Guide
 
-Tokenteller is built around three kinds of drivers:
+Tokenteller has three kinds of drivers:
 
 - model drivers
 - dataset drivers
 - test drivers
 
-Each driver inherits from a base class near the drivers themselves:
+The two most useful example files are:
 
-- model drivers use [src/tokenteller/drivers/models/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/base.py)
-- dataset drivers use [src/tokenteller/drivers/datasets/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/base.py)
-- test drivers use [src/tokenteller/testsuites/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/base.py)
+- model example: [src/tokenteller/drivers/models/sentencepiece.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/sentencepiece.py)
+- dataset example: [src/tokenteller/drivers/datasets/common_crawl.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/common_crawl.py)
 
-## Model Drivers
+## Model Driver
 
-Start from `BaseModelDriver` when you want to support a new model tokenizer.
+Start from [src/tokenteller/drivers/models/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/base.py)
+or copy [src/tokenteller/drivers/models/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/template.py).
 
-You must add:
+You only have to implement:
 
 - `encode(text)`
 
-You may also add:
+You can also implement:
 
 - `decode(token_ids)`
-- `batch_encode(texts)`
-- `token_count(text)`
-- `fragmentation_stats(text)`
 
-Put any model-specific setup in the constructor, such as:
+Put any setup in `__init__()`. This is where you should load the real tokenizer.
+
+Example constructor inputs:
 
 - model path
 - checkpoint name
 - tokenizer options
-- remote loading flags
 
-`encode()` must return a `TokenizationResult`. Expected fields:
+`encode()` must return a `TokenizationResult` with:
 
-- `token_ids`
-- `tokens`
-- `token_count`
-- `offsets`
-- `raw`
-
-Field meanings:
-
-- `token_ids`: integer ids in model order
-- `tokens`: readable token strings when available
+- `token_ids`: list of token ids
+- `tokens`: list of readable token strings
 - `token_count`: usually `len(token_ids)`
-- `offsets`: optional `(start, end)` spans for each token
-- `raw`: optional extra library output
+- `offsets`: token spans or `None`
+- `raw`: any extra library output you want to keep
 
-Use the template in [models/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/template.py).
+Small example:
 
-## Dataset Drivers
+```python
+from tokenteller.core.types import TokenizationResult
+from tokenteller.drivers.models.base import BaseModelDriver
 
-Start from `BaseDatasetDriver` when you want to support a new dataset source.
 
-You must add:
+class MyModelDriver(BaseModelDriver):
+    def __init__(self, model_path: str, name: str = "my_model"):
+        super().__init__(name=name)
+        self.model = load_my_tokenizer(model_path)
+
+    def encode(self, text: str) -> TokenizationResult:
+        token_ids = self.model.encode(text)
+        tokens = self.model.tokens(text)
+        return TokenizationResult(
+            token_ids=token_ids,
+            tokens=tokens,
+            token_count=len(token_ids),
+            offsets=None,
+            raw={},
+        )
+```
+
+## Dataset Driver
+
+Start from [src/tokenteller/drivers/datasets/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/base.py)
+or copy [src/tokenteller/drivers/datasets/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/template.py).
+
+You only have to implement:
 
 - `iter_records(query)`
 
-You may also add:
+Put any setup in `__init__()`. This is where you should load the dataset or open the data source.
 
-- `count(query)`
+Example constructor inputs:
 
-Put any dataset-specific setup in the constructor, such as:
-
-- dataset path
+- file path
 - split name
-- API client
-- preload settings
+- API settings
 
-`iter_records(query)` must yield `DatasetRecord` objects. Expected fields:
+`iter_records(query)` must yield `DatasetRecord` objects with:
 
-- `id`
-- `text`
-- `categories`
-- `metadata`
+- `id`: stable record id
+- `text`: the text to tokenize
+- `categories`: simple labels like language or domain
+- `metadata`: any extra fields you want to keep
 
-Field meanings:
+Small example:
 
-- `id`: stable record identifier
-- `text`: the text that will be tokenized
-- `categories`: simple grouping labels like language or domain
-- `metadata`: any extra information you want to keep
+```python
+from collections.abc import Iterable
 
-Use `categories` for fields you want to group by later, such as:
+from tokenteller.core.types import DatasetQuery, DatasetRecord
+from tokenteller.drivers.datasets.base import BaseDatasetDriver
 
-- language
-- domain
-- source
 
-Use the template in [datasets/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/template.py).
+class MyDatasetDriver(BaseDatasetDriver):
+    def __init__(self, rows: list[dict], name: str = "my_dataset"):
+        super().__init__(name=name)
+        self.rows = rows
 
-## Test Drivers
+    def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        rows = self.rows
+        if query.limit is not None:
+            rows = rows[: query.limit]
 
-Start from `BaseTestDriver` when you want to add a new metric or analysis.
+        for index, row in enumerate(rows, start=1):
+            yield DatasetRecord(
+                id=str(index),
+                text=row["text"],
+                categories={"language": row.get("language", "")},
+                metadata=row,
+            )
+```
 
-You must add:
+## Test Driver
+
+Start from [src/tokenteller/testsuites/base.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/base.py)
+or copy [src/tokenteller/testsuites/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/template.py).
+
+You must implement:
 
 - `name()`
 - `run_case(tokenizer, record, context)`
 
-Put any test-specific setup in the constructor. If you add your own `__init__()`,
-call `super().__init__(label=...)` first so the built-in state tracking still works.
+`run_case(...)` must return a `TestCaseResult`.
 
-`run_case(...)` should return a `TestCaseResult`. In practice:
+Useful fields:
 
-- `metrics` should hold the numeric or summary values you care about
-- `artifacts` can hold extra detail like token lists or spans
+- `metrics`: numbers or summary values
+- `artifacts`: extra detail like tokens or spans
 
-The base class already provides `run_batch()`, result storage, text summaries,
-and a default `compare()` method.
+The base class already handles:
 
-Each test object also stores:
-
-- which model it was bound to
-- which dataset it was bound to
-- whether it has been run yet
-- its saved results, warnings, and summary row
-
-You can print a test object directly to see whether it is pending, failed, or completed.
-You can also override `compare()` if it makes sense to compare two runs of the same test type.
-
-Use the template in [testsuites/template.py](D:/Development/School/asml/tokenteller/src/tokenteller/testsuites/template.py).
+- storing status
+- storing results
+- building summary rows
+- printing a readable summary
+- comparing two finished tests
+- running records in parallel
 
 ## Constructor Parameters
 
-The library does support whatever constructor parameters your driver needs.
-The experiment only receives finished driver objects, so parameter handling stays
-inside your driver classes.
+The experiment does not build drivers for you.
+You build the objects yourself, so your constructors can take whatever parameters you need.
 
-Examples:
+Example:
 
 ```python
-model = MyModelDriver(model_path="my-model", trust_remote_code=True)
-dataset = MyDatasetDriver(data_path="data.jsonl", split="train")
+model = MyModelDriver(model_path="my.model")
+dataset = MyDatasetDriver(data_path="data.jsonl")
 test = MyTestDriver(label="Hindi prompts")
 ```
 
 ## Minimal Workflow
 
-1. Create the driver class from a template.
-2. Fill in the required methods.
-3. Instantiate the driver object directly.
-4. Create an `Experiment`, add models and datasets, bind tests to them, and call `run()`.
+1. Copy a template.
+2. Fill in the required method.
+3. Create the driver object directly.
+4. Add it to an `Experiment`.
+5. Run the experiment.
 
 Example:
 
@@ -152,12 +169,10 @@ Example:
 from tokenteller import Experiment
 from tokenteller.core.types import DatasetQuery
 from tokenteller.testsuites.metrics import TokenCountTest
-from my_project.my_model_driver import MyModelDriver
-from my_project.my_dataset_driver import MyDatasetDriver
 
 experiment = Experiment()
-experiment.add_model(MyModelDriver(model_path="my-model"), name="my_model")
-experiment.add_dataset(MyDatasetDriver(data_path="my-data.jsonl"), name="my_dataset")
+experiment.add_model(MyModelDriver(model_path="my.model"), name="my_model")
+experiment.add_dataset(MyDatasetDriver(data_path="data.jsonl"), name="my_dataset")
 experiment.add_test(
     TokenCountTest(label="english sample"),
     model="my_model",
@@ -170,11 +185,10 @@ report = experiment.run()
 
 ## Keep It Small
 
-For a class project, keep drivers small:
+For this project, keep drivers simple:
 
-- one class per model driver
-- one class per dataset source
-- one class per metric
-- override only the methods you actually need
-
-If a driver starts getting too long, then split helper logic into extra functions. Start simple first.
+- one file per model
+- one file per dataset
+- load things in `__init__()`
+- do the real work in one required method
+- add helper methods only if you actually need them

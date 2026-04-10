@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestContext
+from tokenteller.drivers.datasets import CommonCrawlDatasetDriver
+from tokenteller.drivers.models import SentencePieceModelDriver
 from tokenteller.testsuites.base import BaseTestDriver
 from tokenteller.testsuites.metrics import TokenCountTest
 
 from .fakes import FakeDatasetDriver, FakeTokenizerDriver
+
+
+TEST_DATA_DIR = Path(__file__).resolve().parent / "_generated"
 
 
 def test_tokenizer_helper_methods_work():
@@ -48,6 +56,61 @@ def test_direct_driver_instantiation_is_enough():
 
     assert tokenizer.name == "direct-word"
     assert tokenizer.token_count("a b c") == 3
+
+
+def test_common_crawl_driver_reads_jsonl_export():
+    # Build a tiny local Common Crawl-style JSONL file for the example driver.
+    TEST_DATA_DIR.mkdir(exist_ok=True)
+    data_path = TEST_DATA_DIR / "common_crawl_test.jsonl"
+    rows = [
+        {"id": "1", "text": "hello world", "language": "en", "url": "https://example.com/a"},
+        {"id": "2", "text": "namaste duniya", "language": "hi", "url": "https://example.org/b"},
+    ]
+    data_path.write_text(
+        "\n".join(json.dumps(row) for row in rows),
+        encoding="utf-8",
+    )
+
+    driver = CommonCrawlDatasetDriver(str(data_path))
+    hindi = list(driver.iter_records(DatasetQuery(filters={"language": "hi"})))
+
+    # The driver should produce standard DatasetRecord objects and support filters.
+    assert [record.id for record in hindi] == ["2"]
+    assert hindi[0].categories["domain"] == "example.org"
+
+
+def test_sentencepiece_driver_imports_and_is_optional():
+    # This test keeps the example driver lightweight when sentencepiece is unavailable.
+    try:
+        import sentencepiece as spm
+    except ImportError:
+        return
+
+    # Train a tiny temporary SentencePiece model so the example driver can load it.
+    TEST_DATA_DIR.mkdir(exist_ok=True)
+    temp_path = TEST_DATA_DIR
+    corpus_path = temp_path / "sentencepiece_corpus.txt"
+    model_prefix = temp_path / "sentencepiece_test"
+    model_path = Path(str(model_prefix) + ".model")
+    vocab_path = Path(str(model_prefix) + ".vocab")
+    corpus_path.write_text("hello world\nhello token\nsentence piece example\n", encoding="utf-8")
+
+    spm.SentencePieceTrainer.train(
+        input=str(corpus_path),
+        model_prefix=str(model_prefix),
+        vocab_size=20,
+        model_type="unigram",
+        bos_id=-1,
+        eos_id=-1,
+        pad_id=-1,
+    )
+
+    driver = SentencePieceModelDriver(str(model_path), name="spm")
+    encoded = driver.encode("hello world")
+
+    # The example driver should return a normal TokenizationResult.
+    assert encoded.token_count > 0
+    assert driver.decode(encoded.token_ids)
 
 
 def test_base_test_driver_parallel_batch_preserves_input_order():
