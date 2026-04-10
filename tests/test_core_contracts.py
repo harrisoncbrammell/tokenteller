@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestContext
@@ -58,25 +57,51 @@ def test_direct_driver_instantiation_is_enough():
     assert tokenizer.token_count("a b c") == 3
 
 
-def test_common_crawl_driver_reads_jsonl_export():
-    # Build a tiny local Common Crawl-style JSONL file for the example driver.
-    TEST_DATA_DIR.mkdir(exist_ok=True)
-    data_path = TEST_DATA_DIR / "common_crawl_test.jsonl"
-    rows = [
-        {"id": "1", "text": "hello world", "language": "en", "url": "https://example.com/a"},
-        {"id": "2", "text": "namaste duniya", "language": "hi", "url": "https://example.org/b"},
-    ]
-    data_path.write_text(
-        "\n".join(json.dumps(row) for row in rows),
-        encoding="utf-8",
+def test_common_crawl_driver_builds_records_from_index_captures():
+    # Use a fake fetcher so the driver contract stays testable without network access.
+    class FakeCapture(dict):
+        def __init__(self, content: bytes, **fields):
+            super().__init__(fields)
+            self.content = content
+
+    class FakeCDXFetcher:
+        def iter(self, target, limit=None, filter=None):
+            assert target == "*.example.org"
+            assert filter == ["=status:200"]
+            captures = [
+                FakeCapture(
+                    b"hello world",
+                    url="https://example.org/a",
+                    status="200",
+                    mime="text/plain",
+                    digest="digest-1",
+                ),
+                FakeCapture(
+                    b"hola mundo",
+                    url="https://example.org/b",
+                    status="200",
+                    mime="text/plain",
+                    digest="digest-2",
+                ),
+            ]
+            if limit is None:
+                return captures
+            return captures[:limit]
+
+    driver = CommonCrawlDatasetDriver(fetcher=FakeCDXFetcher())
+    records = list(
+        driver.iter_records(
+            DatasetQuery(
+                filters={"domain": "example.org", "status": "200", "mime": "text/plain"},
+                limit=1,
+            )
+        )
     )
 
-    driver = CommonCrawlDatasetDriver(str(data_path))
-    hindi = list(driver.iter_records(DatasetQuery(filters={"language": "hi"})))
-
-    # The driver should produce standard DatasetRecord objects and support filters.
-    assert [record.id for record in hindi] == ["2"]
-    assert hindi[0].categories["domain"] == "example.org"
+    # The driver should produce normal DatasetRecord objects from CDX captures.
+    assert [record.id for record in records] == ["digest-1"]
+    assert records[0].categories["domain"] == "example.org"
+    assert records[0].categories["source"] == "common_crawl"
 
 
 def test_sentencepiece_driver_imports_and_is_optional():

@@ -151,7 +151,7 @@ Example:
 
 ```python
 model = MyModelDriver(model_path="my.model")
-dataset = MyDatasetDriver(data_path="data.jsonl")
+dataset = MyDatasetDriver()
 test = MyTestDriver(label="Hindi prompts")
 ```
 
@@ -172,7 +172,7 @@ from tokenteller.testsuites.metrics import TokenCountTest
 
 experiment = Experiment()
 experiment.add_model(MyModelDriver(model_path="my.model"), name="my_model")
-experiment.add_dataset(MyDatasetDriver(data_path="data.jsonl"), name="my_dataset")
+experiment.add_dataset(MyDatasetDriver(), name="my_dataset")
 experiment.add_test(
     TokenCountTest(label="english sample"),
     model="my_model",
@@ -192,3 +192,65 @@ For this project, keep drivers simple:
 - load things in `__init__()`
 - do the real work in one required method
 - add helper methods only if you actually need them
+
+For remote datasets such as Common Crawl, keep the query object generic. It is
+better to reuse `DatasetQuery(filters=...)` and let the driver translate a few
+plain keys like `domain`, `url`, or `status` than to create a separate query
+class just for one backend.
+
+## Query Shape
+
+Keep dataset queries simple and consistent across drivers. `DatasetQuery` has
+four fields:
+
+- `filters`: a dictionary of plain filter values
+- `limit`: max records to return
+- `sample_strategy`: `head`, `tail`, or `random`
+- `seed`: optional random seed
+
+Example:
+
+```python
+query = DatasetQuery(
+    filters={"language": "en"},
+    limit=25,
+    sample_strategy="random",
+    seed=7,
+)
+```
+
+Try to avoid creating a custom query object for one dataset. It is easier for
+teammates if every driver still accepts `DatasetQuery`, even when the supported
+filter keys differ.
+
+## Common Crawl Queries
+
+The Common Crawl driver is a good example of this pattern. It still uses
+`DatasetQuery`, but it interprets a few filter keys specially:
+
+- `domain`: fetch pages under a domain such as `example.org`
+- `url`: fetch one exact URL or a Common Crawl URL query
+- `url_pattern`: pass an explicit CDX query string such as `*.example.org/*`
+- `status`: filter by HTTP status such as `200`
+- `mime`: filter by mime type such as `text/html`
+
+Examples:
+
+```python
+DatasetQuery(filters={"domain": "example.org"}, limit=10)
+DatasetQuery(filters={"url": "https://commoncrawl.org/"}, limit=5)
+DatasetQuery(filters={"url_pattern": "*.example.org/*", "status": "200"}, limit=20)
+DatasetQuery(filters={"domain": "example.org", "mime": "text/html"}, limit=10)
+```
+
+If you want to use this driver, install the optional dependency:
+
+```bash
+pip install -e .[commoncrawl]
+```
+
+This keeps the public interface small:
+
+- experiments only need to know about `DatasetQuery`
+- each dataset driver can decide which filter keys it supports
+- new drivers can stay beginner-friendly instead of adding a second query API

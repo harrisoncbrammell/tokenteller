@@ -22,7 +22,7 @@ from tokenteller.core.types import DatasetQuery, RunConfig
 from tokenteller.testsuites.metrics import FragmentationTest, TokenCountTest
 
 model = MyModelDriver(model_path="my-model")
-dataset = MyDatasetDriver(data_path="my-data.jsonl")
+dataset = MyDatasetDriver()
 
 experiment = Experiment(
     run_config=RunConfig(max_workers=4, baseline_tokenizer="my_model"),
@@ -49,6 +49,60 @@ If you want tiny example drivers to copy from, start here:
 
 - [src/tokenteller/drivers/models/sentencepiece.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/models/sentencepiece.py)
 - [src/tokenteller/drivers/datasets/common_crawl.py](D:/Development/School/asml/tokenteller/src/tokenteller/drivers/datasets/common_crawl.py)
+
+The Common Crawl example keeps the same `DatasetQuery` shape as every other
+dataset driver:
+
+```python
+from tokenteller.core.types import DatasetQuery
+from tokenteller.drivers.datasets import CommonCrawlDatasetDriver
+
+dataset = CommonCrawlDatasetDriver()
+query = DatasetQuery(
+    filters={"domain": "commoncrawl.org", "status": "200", "mime": "text/html"},
+    limit=10,
+)
+```
+
+## Dataset Queries
+
+Every dataset driver receives the same `DatasetQuery` object:
+
+- `filters`: simple equality filters
+- `limit`: maximum number of records to return
+- `sample_strategy`: `head`, `tail`, or `random`
+- `seed`: random seed used with `sample_strategy="random"`
+
+Example:
+
+```python
+query = DatasetQuery(
+    filters={"language": "en"},
+    limit=25,
+    sample_strategy="random",
+    seed=7,
+)
+```
+
+The meaning of `filters` depends on the dataset driver:
+
+- a small in-memory dataset might support keys like `language` or `domain`
+- the Common Crawl driver understands `domain`, `url`, `url_pattern`, `status`, and `mime`
+
+Common Crawl examples:
+
+```python
+DatasetQuery(filters={"domain": "example.org"}, limit=10)
+DatasetQuery(filters={"url": "https://commoncrawl.org/"}, limit=5)
+DatasetQuery(filters={"url_pattern": "*.example.org/*", "status": "200"}, limit=20)
+DatasetQuery(filters={"domain": "example.org", "mime": "text/html"}, limit=10)
+```
+
+If you want to use the Common Crawl driver, install the optional dependency:
+
+```bash
+pip install -e .[commoncrawl]
+```
 
 ## Run An Experiment
 

@@ -4,7 +4,6 @@ from .base import BaseModelDriver
 
 
 class SentencePieceModelDriver(BaseModelDriver):
-    """Very small example driver for an existing SentencePiece model file."""
 
     def __init__(self, model_path: str, name: str = "sentencepiece"):
         # Save the short driver name used by the experiment.
