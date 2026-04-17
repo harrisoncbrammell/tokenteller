@@ -74,10 +74,14 @@ class NSLTest(BaseTestDriver):
     ) -> TestCaseResult:
         # NSL asks: how long is this tokenized sequence relative to the baseline?
         tokenization = context.get_tokenization(tokenizer, record)
-        baseline_count = context.baseline_token_counts.get(record.id)
-        if not baseline_count:
-            # Without baseline data, the ratio cannot be computed.
-            context.add_warning(f"Missing baseline token count for record '{record.id}'.")
+        baseline_name = context.run_config.baseline_tokenizer or tokenizer.name
+        baseline_model = context.models.get(baseline_name)
+        if baseline_model is None:
+            raise KeyError(f"Baseline model '{baseline_name}' was not added.")
+
+        baseline_count = context.get_tokenization(baseline_model, record).token_count
+        if baseline_count == 0:
+            context.warnings.append(f"Baseline token count for record '{record.id}' is zero.")
             nsl = None
         else:
             # Compare this token count to the baseline token count.

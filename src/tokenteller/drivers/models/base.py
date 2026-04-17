@@ -12,8 +12,7 @@ class BaseModelDriver(ABC):
     """Base class for every model/tokenizer driver in the project."""
 
     def __init__(self, name: str):
-        # Every driver gets a short stable name for summaries and lookups.
-        self.name = name
+         self.name = name
 
     @abstractmethod
     def encode(self, text: str) -> TokenizationResult:

@@ -23,7 +23,6 @@ class BaseTestDriver(ABC):
         self.results: list[TestCaseResult] = []
         self.summary: list[dict[str, object]] = []
         self.warnings: list[str] = []
-        self.error: str | None = None
 
     @abstractmethod
     def name(self) -> str:
@@ -48,7 +47,6 @@ class BaseTestDriver(ABC):
         query: DatasetQuery | None = None,
     ) -> "BaseTestDriver":
         """Attach the test to one model and one dataset inside an experiment."""
-        # Binding resets any previous run state so the same test object can be reused.
         self.model_name = model_name
         self.dataset_name = dataset_name
         self.query = query or DatasetQuery()
@@ -56,7 +54,6 @@ class BaseTestDriver(ABC):
         self.results = []
         self.summary = []
         self.warnings = []
-        self.error = None
         return self
 
     def run_batch(
@@ -96,16 +93,7 @@ class BaseTestDriver(ABC):
         self.status = "completed"
         self.results = results
         self.warnings = list(warnings or [])
-        self.error = None
         self.summary = [self._build_summary_row()]
-
-    def store_error(self, error: str) -> None:
-        """Save a failed run so the test can still be inspected or printed."""
-        self.status = "failed"
-        self.results = []
-        self.summary = []
-        self.warnings = []
-        self.error = error
 
     def summary_rows(self) -> list[dict[str, object]]:
         """Return either the saved summary row or a simple status row."""
@@ -120,9 +108,7 @@ class BaseTestDriver(ABC):
             "dataset": self.dataset_name or "",
             "status": self.status,
         }
-        if self.error:
-            row["message"] = self.error
-        elif self.status == "not_run":
+        if self.status == "not_run":
             row["message"] = "not run yet"
         return [row]
 

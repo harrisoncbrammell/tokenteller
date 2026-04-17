@@ -6,20 +6,16 @@ from .base import BaseModelDriver
 class SentencePieceModelDriver(BaseModelDriver):
 
     def __init__(self, model_path: str, name: str = "sentencepiece"):
-        # Save the short driver name used by the experiment.
         super().__init__(name=name)
-        # Save the model path so users can see what file was loaded.
         self.model_path = model_path
 
-        # Import SentencePiece only when someone actually uses this driver.
+        # import SentencePiece only when someone actually uses this driver
         try:
             import sentencepiece as spm
         except ImportError as exc:
-            raise ImportError(
-                "SentencePieceModelDriver requires the 'sentencepiece' package."
-            ) from exc
+            raise ImportError("SentencePieceModelDriver requires the 'sentencepiece' package.") from exc
 
-        # Load the existing .model file into one SentencePiece processor object.
+        # load existing .model file into one sentencepiece processor object
         self.sp = spm.SentencePieceProcessor(model_file=self.model_path)
 
     def encode(self, text: str) -> TokenizationResult:

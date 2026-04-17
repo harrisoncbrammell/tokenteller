@@ -31,15 +31,11 @@ def test_experiment_end_to_end_returns_summary():
     experiment.add_dataset(dataset)
 
     # Run the same built-in tests on both models.
-    report = experiment.add_tests(
-        [TokenCountTest(), FragmentationTest(), NSLTest(), CostEstimateTest()],
-        model="tt-word",
-        dataset="custom",
-    ).add_tests(
-        [TokenCountTest(), FragmentationTest(), NSLTest(), CostEstimateTest()],
-        model="tt-char",
-        dataset="custom",
-    ).run()
+    for model_name in ("tt-word", "tt-char"):
+        for test in (TokenCountTest(), FragmentationTest(), NSLTest(), CostEstimateTest()):
+            experiment.add_test(test, model=model_name, dataset="custom")
+
+    report = experiment.run()
 
     # Index the summary rows for easy assertions.
     summary_rows = {(row["tokenizer"], row["test"]): row for row in report.summary}

@@ -88,12 +88,8 @@ def main() -> None:
 
     english_chat = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
     for model_name in ("word-demo", "char-demo"):
-        experiment.add_tests(
-            [TokenCountTest(), FragmentationTest(), NSLTest()],
-            model=model_name,
-            dataset="demo",
-            query=english_chat,
-        )
+        for test in (TokenCountTest(), FragmentationTest(), NSLTest()):
+            experiment.add_test(test, model=model_name, dataset="demo", query=english_chat)
 
     report = experiment.run()
     print(report.summary_table())

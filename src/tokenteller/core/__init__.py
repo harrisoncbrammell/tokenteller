@@ -1,5 +1,5 @@
 # Re-export the shared core pieces from one import location.
-from .runner import Experiment, ExperimentRunner
+from .runner import Experiment
 from .types import (
     DatasetQuery,
     DatasetRecord,
@@ -22,7 +22,6 @@ __all__ = [
     "DatasetQuery",
     "DatasetRecord",
     "Experiment",
-    "ExperimentRunner",
     "RunConfig",
     "TestCaseResult",
     "TestContext",

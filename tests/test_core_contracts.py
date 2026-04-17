@@ -154,15 +154,12 @@ def test_base_test_driver_parallel_batch_preserves_input_order():
                 time.sleep(0.01)
             return TokenCountTest().run_case(tokenizer, record, context)
 
-    # The final result order should still match the input order.
     records = [
         DatasetRecord(id="1", text="alpha beta"),
         DatasetRecord(id="2", text="gamma"),
         DatasetRecord(id="3", text="delta epsilon zeta"),
     ]
-    context = TestContext(
-        run_config=RunConfig(max_workers=3),
-    )
+    context = TestContext(run_config=RunConfig(max_workers=3))
 
     results = OrderedEchoTest().run_batch(FakeTokenizerDriver("parallel-fake"), records, context)
 

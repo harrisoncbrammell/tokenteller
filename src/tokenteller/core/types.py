@@ -4,27 +4,11 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
 
-from .utils import render_table, serialize_value
-
-
-class SimpleObject:
-    """Small helper mixin for turning results into dicts and text tables."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert nested dataclasses and helpers into plain dictionaries."""
-        return serialize_value(self)
-
-    def summary_rows(self) -> list[dict[str, Any]]:
-        """Default one-row summary used by small result objects."""
-        return [self.to_dict()]
-
-    def summary_table(self) -> str:
-        """Render the summary rows as a plain text table."""
-        return render_table(self.summary_rows())
+from .utils import render_table
 
 
 @dataclass(slots=True)
-class DatasetRecord(SimpleObject):
+class DatasetRecord:
     """One text example plus any categories or extra metadata."""
 
     id: str
@@ -34,7 +18,7 @@ class DatasetRecord(SimpleObject):
 
 
 @dataclass(slots=True)
-class DatasetQuery(SimpleObject):
+class DatasetQuery:
     """Simple filter and sampling settings for dataset drivers."""
 
     filters: dict[str, Any] = field(default_factory=dict)
@@ -44,7 +28,7 @@ class DatasetQuery(SimpleObject):
 
 
 @dataclass(slots=True)
-class TokenizationResult(SimpleObject):
+class TokenizationResult:
     """Shared tokenization output returned by every model driver."""
 
     token_ids: list[int]
@@ -55,7 +39,7 @@ class TokenizationResult(SimpleObject):
 
 
 @dataclass(slots=True)
-class RunConfig(SimpleObject):
+class RunConfig:
     """Small group of experiment-wide settings."""
 
     max_workers: int | None = None
@@ -64,7 +48,7 @@ class RunConfig(SimpleObject):
 
 
 @dataclass(slots=True)
-class TestCaseResult(SimpleObject):
+class TestCaseResult:
     """Result of running one test on one record with one model."""
 
     record_id: str
@@ -75,16 +59,16 @@ class TestCaseResult(SimpleObject):
 
 
 @dataclass(slots=True)
-class TestRunReport(SimpleObject):
+class TestRunReport:
     """Top-level experiment output with summary rows and raw results."""
 
     summary: list[dict[str, Any]]
     results: list[TestCaseResult]
     warnings: list[str]
 
-    def summary_rows(self) -> list[dict[str, Any]]:
-        """Use the precomputed summary rows directly."""
-        return self.summary
+    def summary_table(self) -> str:
+        """Render the experiment summary rows as a plain text table."""
+        return render_table(self.summary)
 
 
 @dataclass
@@ -92,8 +76,7 @@ class TestContext:
     """Shared per-test-run state used while processing many records."""
 
     run_config: RunConfig
-    baseline_tokenizer_name: str | None = None
-    baseline_token_counts: dict[str, int] = field(default_factory=dict)
+    models: dict[str, Any] = field(default_factory=dict)
     tokenization_cache: dict[tuple[str, str], TokenizationResult] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     _cache_lock: Lock = field(default_factory=Lock, init=False, repr=False)
@@ -113,8 +96,3 @@ class TestContext:
             result = tokenizer.encode(record.text)
             self.tokenization_cache[key] = result
             return result
-
-    def add_warning(self, warning: str) -> None:
-        """Add a warning once without duplicating it."""
-        if warning not in self.warnings:
-            self.warnings.append(warning)

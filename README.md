@@ -25,7 +25,7 @@ model = MyModelDriver(model_path="my-model")
 dataset = MyDatasetDriver()
 
 experiment = Experiment(
-    run_config=RunConfig(max_workers=4, baseline_tokenizer="my_model"),
+    run_config=RunConfig(baseline_tokenizer="my_model"),
 )
 
 experiment.add_model(model, name="my_model")
@@ -132,12 +132,6 @@ print(test.status)
 print(test.summary_table())
 print(test.results)
 print(test.warnings)
-```
-
-If two tests are the same type, you can compare them.
-
-```python
-print(experiment.tests[0].compare(experiment.tests[1]))
 ```
 
 ## Driver Instructions
