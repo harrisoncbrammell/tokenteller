@@ -8,10 +8,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TokenizationResult
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult, TokenizationResult
 from tokenteller.drivers.datasets.base import BaseDatasetDriver
 from tokenteller.drivers.models.base import BaseModelDriver
-from tokenteller.testsuites.metrics import FragmentationTest, NSLTest, TokenCountTest
+from tokenteller.testsuites.base import BaseTestDriver
 
 
 class DemoTokenizer(BaseModelDriver):
@@ -75,25 +75,50 @@ class DemoDataset(BaseDatasetDriver):
         return records[: query.limit]
 
 
-def main() -> None:
-    experiment = Experiment(
-        run_config=RunConfig(
-            baseline_tokenizer="word-demo",
-            cost_per_1k_tokens={"word-demo": 0.20, "char-demo": 0.45},
-        )
-    )
-    experiment.add_model(DemoTokenizer("word-demo", mode="word"))
-    experiment.add_model(DemoTokenizer("char-demo", mode="char"))
-    experiment.add_dataset(DemoDataset())
+class EnglishChatTokenCountTest(BaseTestDriver):
+    def __init__(self, model: BaseModelDriver, label: str | None = None):
+        super().__init__(model=model, label=label)
+        self.dataset = DemoDataset()
+        self.query = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
 
-    english_chat = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
-    for model_name in ("word-demo", "char-demo"):
-        experiment.add_tests(
-            [TokenCountTest(), FragmentationTest(), NSLTest()],
-            model=model_name,
-            dataset="demo",
-            query=english_chat,
-        )
+    def name(self) -> str:
+        return "token_count"
+
+    def run(self) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        if not records:
+            self.warnings.append("No dataset records matched the test query.")
+            return
+
+        for record in records:
+            tokenization = self.model.encode(record.text)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
+
+        average = sum(result.metrics["token_count"] for result in self.results) / len(self.results)
+        self.summary = [
+            {
+                "test": self.label,
+                "type": self.name(),
+                "model": self.model.name,
+                "tokenizer": self.model.name,
+                "status": "completed",
+                "token_count": average,
+            }
+        ]
+
+
+def main() -> None:
+    experiment = Experiment()
+    experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("word-demo", mode="word"), label="english chat words"))
+    experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("char-demo", mode="char"), label="english chat chars"))
 
     report = experiment.run()
     print(report.summary_table())

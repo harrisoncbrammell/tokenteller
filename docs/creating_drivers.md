@@ -124,23 +124,13 @@ or copy [src/tokenteller/testsuites/template.py](D:/Development/School/asml/toke
 You must implement:
 
 - `name()`
-- `run_case(tokenizer, record, context)`
+- `run()`
 
-`run_case(...)` must return a `TestCaseResult`.
+Inside `run(...)`, store your own:
 
-Useful fields:
-
-- `metrics`: numbers or summary values
-- `artifacts`: extra detail like tokens or spans
-
-The base class already handles:
-
-- storing status
-- storing results
-- building summary rows
-- printing a readable summary
-- comparing two finished tests
-- running records in parallel
+- `results`
+- `summary`
+- `warnings`
 
 ## Constructor Parameters
 
@@ -151,34 +141,51 @@ Example:
 
 ```python
 model = MyModelDriver(model_path="my.model")
-dataset = MyDatasetDriver(data_path="data.jsonl")
-test = MyTestDriver(label="Hindi prompts")
+test = MyTestDriver(model=model, label="Hindi prompts")
 ```
 
 ## Minimal Workflow
 
 1. Copy a template.
-2. Fill in the required method.
-3. Create the driver object directly.
-4. Add it to an `Experiment`.
+2. Create the dataset driver and query inside the test.
+3. Fill in the required methods.
+4. Add the test to an `Experiment`.
 5. Run the experiment.
 
 Example:
 
 ```python
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery
-from tokenteller.testsuites.metrics import TokenCountTest
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
+from tokenteller.testsuites.base import BaseTestDriver
+
+
+class EnglishTokenCountTest(BaseTestDriver):
+    def __init__(self, model, label: str | None = None):
+        super().__init__(model=model, label=label)
+        self.dataset = MyDatasetDriver()
+        self.query = DatasetQuery(limit=25)
+
+    def name(self) -> str:
+        return "token_count"
+
+    def run(self) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        for record in records:
+            tokenization = self.model.encode(record.text)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
+
 
 experiment = Experiment()
-experiment.add_model(MyModelDriver(model_path="my.model"), name="my_model")
-experiment.add_dataset(MyDatasetDriver(data_path="data.jsonl"), name="my_dataset")
-experiment.add_test(
-    TokenCountTest(label="english sample"),
-    model="my_model",
-    dataset="my_dataset",
-    query=DatasetQuery(limit=25),
-)
+experiment.add_test(EnglishTokenCountTest(MyModelDriver(model_path="my.model"), label="english sample"))
 
 report = experiment.run()
 ```
@@ -190,5 +197,67 @@ For this project, keep drivers simple:
 - one file per model
 - one file per dataset
 - load things in `__init__()`
-- do the real work in one required method
+- do the real work in `run()`
 - add helper methods only if you actually need them
+
+For remote datasets such as Common Crawl, keep the query object generic inside
+the test. It is better to reuse `DatasetQuery(filters=...)` and let the driver
+translate a few plain keys like `domain`, `url`, or `status` than to create a
+separate query class just for one backend.
+
+## Query Shape
+
+Keep dataset queries simple and consistent across drivers. `DatasetQuery` has
+four fields:
+
+- `filters`: a dictionary of plain filter values
+- `limit`: max records to return
+- `sample_strategy`: `head`, `tail`, or `random`
+- `seed`: optional random seed
+
+Example:
+
+```python
+query = DatasetQuery(
+    filters={"language": "en"},
+    limit=25,
+    sample_strategy="random",
+    seed=7,
+)
+```
+
+Try to avoid creating a custom query object for one dataset. It is easier for
+teammates if every driver still accepts `DatasetQuery`, even when the supported
+filter keys differ.
+
+## Common Crawl Queries
+
+The Common Crawl driver is a good example of this pattern. It still uses
+`DatasetQuery`, but it interprets a few filter keys specially:
+
+- `domain`: fetch pages under a domain such as `example.org`
+- `url`: fetch one exact URL or a Common Crawl URL query
+- `url_pattern`: pass an explicit CDX query string such as `*.example.org/*`
+- `status`: filter by HTTP status such as `200`
+- `mime`: filter by mime type such as `text/html`
+
+Examples:
+
+```python
+DatasetQuery(filters={"domain": "example.org"}, limit=10)
+DatasetQuery(filters={"url": "https://commoncrawl.org/"}, limit=5)
+DatasetQuery(filters={"url_pattern": "*.example.org/*", "status": "200"}, limit=20)
+DatasetQuery(filters={"domain": "example.org", "mime": "text/html"}, limit=10)
+```
+
+If you want to use this driver, install the optional dependency:
+
+```bash
+pip install -e .[commoncrawl]
+```
+
+This keeps the public interface small:
+
+- experiments only need to know about `DatasetQuery`
+- each dataset driver can decide which filter keys it supports
+- new drivers can stay beginner-friendly instead of adding a second query API

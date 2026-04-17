@@ -1,123 +1,117 @@
 from __future__ import annotations
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig
-from tokenteller.testsuites.metrics import CostEstimateTest, FragmentationTest, NSLTest, TokenCountTest
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
+from tokenteller.testsuites.base import BaseTestDriver
+from tokenteller.testsuites.fragmentation import FragmentationTest
 
 from .fakes import FakeDatasetDriver, FakeTokenizerDriver
 
 
-def test_experiment_end_to_end_returns_summary():
-    # Build a small dataset and compare two fake models on it.
-    dataset = FakeDatasetDriver(
-        name="custom",
-        records=[
-            DatasetRecord(id="1", text="hello world", categories={"language": "en", "domain": "chat"}),
-            DatasetRecord(id="2", text="नमस्ते दुनिया", categories={"language": "hi", "domain": "chat"}),
-        ],
-    )
-
-    # Configure the experiment-wide baseline, cost table, and worker count.
-    experiment = Experiment(
-        run_config=RunConfig(
-            baseline_tokenizer="tt-word",
-            cost_per_1k_tokens={"tt-word": 0.25, "tt-char": 0.5},
-            max_workers=4,
+class EnglishTokenCountTest(BaseTestDriver):
+    def __init__(self, model, label: str | None = None):
+        super().__init__(model=model, label=label)
+        self.dataset = FakeDatasetDriver(
+            name="custom",
+            records=[
+                DatasetRecord(id="1", text="hello world", categories={"language": "en", "domain": "chat"}),
+                DatasetRecord(id="2", text="namaste duniya", categories={"language": "hi", "domain": "chat"}),
+                DatasetRecord(id="3", text="goodbye friend", categories={"language": "en", "domain": "docs"}),
+            ],
         )
-    )
-    # Add the models and dataset before binding tests.
-    experiment.add_model(FakeTokenizerDriver("tt-word", mode="word"))
-    experiment.add_model(FakeTokenizerDriver("tt-char", mode="char"))
-    experiment.add_dataset(dataset)
+        self.query = DatasetQuery(filters={"language": "en"}, limit=2)
 
-    # Run the same built-in tests on both models.
-    report = experiment.add_tests(
-        [TokenCountTest(), FragmentationTest(), NSLTest(), CostEstimateTest()],
-        model="tt-word",
-        dataset="custom",
-    ).add_tests(
-        [TokenCountTest(), FragmentationTest(), NSLTest(), CostEstimateTest()],
-        model="tt-char",
-        dataset="custom",
-    ).run()
+    def name(self) -> str:
+        return "token_count"
 
-    # Index the summary rows for easy assertions.
+    def run(self) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        if not records:
+            self.warnings.append("No dataset records matched the test query.")
+            return
+
+        for record in records:
+            tokenization = self.model.encode(record.text)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
+
+        average = sum(result.metrics["token_count"] for result in self.results) / len(self.results)
+        self.summary = [
+            {
+                "test": self.label,
+                "type": self.name(),
+                "model": self.model.name,
+                "tokenizer": self.model.name,
+                "status": "completed",
+                "token_count": average,
+            }
+        ]
+
+
+def test_experiment_end_to_end_returns_summary():
+    experiment = Experiment()
+    experiment.add_test(EnglishTokenCountTest(FakeTokenizerDriver("tt-word", mode="word"), label="word count"))
+    experiment.add_test(EnglishTokenCountTest(FakeTokenizerDriver("tt-char", mode="char"), label="char count"))
+
+    report = experiment.run()
     summary_rows = {(row["tokenizer"], row["test"]): row for row in report.summary}
 
-    assert ("tt-word", "token_count") in summary_rows
-    assert ("tt-char", "nsl") in summary_rows
-    assert summary_rows[("tt-word", "nsl")]["nsl"] == 1.0
-    assert summary_rows[("tt-char", "cost")]["estimated_cost"] > 0
+    assert ("tt-word", "word count") in summary_rows
+    assert ("tt-char", "char count") in summary_rows
+    assert summary_rows[("tt-word", "word count")]["token_count"] == 2.0
+    assert summary_rows[("tt-char", "char count")]["token_count"] > 2.0
     assert "tokenizer" in report.summary_table()
 
-def test_nsl_metric_tracks_baseline_ratio():
-    # NSL should be 1.0 for the baseline tokenizer and larger for a more fragmented one.
-    dataset = FakeDatasetDriver(
-        name="single",
-        records=[
-            DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"}),
-        ],
-    )
 
-    experiment = Experiment(run_config=RunConfig(baseline_tokenizer="tt-word"))
-    experiment.add_model(FakeTokenizerDriver("tt-word", mode="word"))
-    experiment.add_model(FakeTokenizerDriver("tt-hybrid", mode="hybrid"))
-    experiment.add_dataset(dataset)
+def test_test_object_tracks_status_and_output():
+    test = EnglishTokenCountTest(FakeTokenizerDriver("word"), label="english words")
 
-    # Bind one NSL test per model and run them together.
-    report = experiment.add_test(NSLTest(), model="tt-word", dataset="single").add_test(
-        NSLTest(),
-        model="tt-hybrid",
-        dataset="single",
-    ).run()
+    assert test.status == "not_run"
+    assert test.results == []
 
-    summary_rows = {(row["tokenizer"], row["test"]): row for row in report.summary}
-    assert summary_rows[("tt-word", "nsl")]["nsl"] == 1.0
-    assert summary_rows[("tt-hybrid", "nsl")]["nsl"] > 1.0
+    Experiment().add_test(test).run()
+
+    assert test.status == "completed"
+    assert len(test.results) == 2
+    assert test.summary[0]["token_count"] == 2.0
 
 
-def test_experiment_object_collects_tests_and_runs_them():
-    # This test exercises the lower-level Experiment workflow directly.
-    dataset = FakeDatasetDriver(
-        name="single",
-        records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
-    )
-    experiment = Experiment(run_config=RunConfig(baseline_tokenizer="word", max_workers=2))
-    # Add two models and one dataset to the experiment.
-    experiment.add_model(FakeTokenizerDriver("word"))
-    experiment.add_model(FakeTokenizerDriver("hybrid", mode="hybrid"))
-    experiment.add_dataset(dataset)
+def test_compare_raises_by_default():
+    first = EnglishTokenCountTest(FakeTokenizerDriver("word"), label="first")
+    second = EnglishTokenCountTest(FakeTokenizerDriver("hybrid", mode="hybrid"), label="second")
 
-    # Bind different tests to different models.
-    experiment.add_test(TokenCountTest(), model="word", dataset="single", query=DatasetQuery(limit=1))
-    experiment.add_test(NSLTest(), model="hybrid", dataset="single", query=DatasetQuery(limit=1))
-    report = experiment.run()
+    Experiment().add_test(first).add_test(second).run()
 
-    summary_rows = {(row["model"], row["type"]): row for row in report.summary}
-    assert ("word", "token_count") in summary_rows
-    assert ("hybrid", "nsl") in summary_rows
+    try:
+        first.compare(second)
+    except NotImplementedError as error:
+        assert "does not support comparisons" in str(error)
+    else:
+        raise AssertionError("compare() should raise by default.")
 
 
-def test_test_object_tracks_status_and_compare_output():
-    # Test objects should start in a not-run state.
+def test_fragmentation_test_calculates_word_piece_stats():
     dataset = FakeDatasetDriver(
         name="demo",
-        records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
+        records=[DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"})],
     )
-    word_test = TokenCountTest(label="english-word")
-    hybrid_test = TokenCountTest(label="english-hybrid")
 
-    assert "not run yet" in str(word_test)
+    test = FragmentationTest(
+        FakeTokenizerDriver("hybrid", mode="hybrid"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="fragmentation demo",
+    )
 
-    experiment = Experiment(run_config=RunConfig(max_workers=2))
-    # Run the same test type on two models so compare() has data.
-    experiment.add_model(FakeTokenizerDriver("word"))
-    experiment.add_model(FakeTokenizerDriver("hybrid", mode="hybrid"))
-    experiment.add_dataset(dataset)
-    experiment.add_test(word_test, model="word", dataset="demo")
-    experiment.add_test(hybrid_test, model="hybrid", dataset="demo")
-    experiment.run()
+    report = Experiment().add_test(test).run()
 
-    assert word_test.status == "completed"
-    comparison = word_test.compare(hybrid_test)
-    assert "difference" in comparison
+    assert report.summary[0]["pieces_per_word"] > 1.0
+    assert report.summary[0]["max_pieces_per_word"] == 2
+    assert test.results[0].artifacts["word_fragments"][0]["tokens"] == ["fra", "gmentation"]

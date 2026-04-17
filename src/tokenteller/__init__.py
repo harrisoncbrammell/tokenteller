@@ -3,7 +3,6 @@ from .core.runner import Experiment
 from .core.types import (
     DatasetQuery,
     DatasetRecord,
-    RunConfig,
     TestCaseResult,
     TestRunReport,
     TokenizationResult,
@@ -20,7 +19,6 @@ __all__ = [
     "DatasetQuery",
     "DatasetRecord",
     "Experiment",
-    "RunConfig",
     "TestCaseResult",
     "TestRunReport",
     "TokenizationResult",

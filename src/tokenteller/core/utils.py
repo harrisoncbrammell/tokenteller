@@ -1,25 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
 from typing import Any
-
-
-def serialize_value(value: Any) -> Any:
-    # Flatten dataclasses into plain nested Python objects.
-    if is_dataclass(value):
-        return {key: serialize_value(val) for key, val in asdict(value).items()}
-    # Respect helper objects that already know how to serialize themselves.
-    if hasattr(value, "to_dict") and callable(value.to_dict):
-        return value.to_dict()
-    # Recurse through dictionaries.
-    if isinstance(value, dict):
-        return {str(key): serialize_value(val) for key, val in value.items()}
-    # Recurse through common sequence types.
-    if isinstance(value, (list, tuple, set)):
-        return [serialize_value(item) for item in value]
-    # Return primitive values unchanged.
-    return value
-
 
 def stringify(value: Any) -> str:
     # Format floats compactly for text tables.
