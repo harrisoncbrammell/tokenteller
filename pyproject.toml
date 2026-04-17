@@ -17,6 +17,9 @@ dependencies = []
 commoncrawl = [
   "cdx-toolkit>=0.9.38",
 ]
+huggingface = [
+  "transformers>=4.0",
+]
 dev = [
   "pytest>=8.0",
 ]
