@@ -7,8 +7,6 @@ from ...core.types import DatasetQuery, DatasetRecord
 
 
 class BaseDatasetDriver(ABC):
-    """Base class for any source of text records."""
-
     def __init__(self, name: str):
         # Every dataset gets a short stable name for experiment setup.
         self.name = name
