@@ -12,7 +12,7 @@ pip install -e .
 
 ## Create An Experiment
 
-Build your model driver objects first, then add self-contained tests to an `Experiment`.
+Build self-contained tests first, then add them to an `Experiment`.
 
 ```python
 from my_project.my_dataset_driver import MyDatasetDriver
@@ -21,38 +21,32 @@ from tokenteller import Experiment
 from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
 from tokenteller.testsuites.base import BaseTestDriver
 
-model = MyModelDriver(model_path="my-model")
-
-
 class EnglishTokenCountTest(BaseTestDriver):
-    def __init__(self, label: str | None = None):
-        super().__init__(label=label)
+    def __init__(self, model, label: str | None = None):
+        super().__init__(model=model, label=label)
         self.dataset = MyDatasetDriver()
         self.query = DatasetQuery(filters={"language": "en"}, limit=50)
 
     def name(self) -> str:
         return "token_count"
 
-    def get_records(self) -> list[DatasetRecord]:
-        return list(self.dataset.iter_records(self.query))
+    def run(self, context: TestContext) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        for record in records:
+            tokenization = context.get_tokenization(self.model, record)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
 
-    def run_case(self, tokenizer, record, context: TestContext) -> TestCaseResult:
-        tokenization = context.get_tokenization(tokenizer, record)
-        return TestCaseResult(
-            record_id=record.id,
-            tokenizer_name=tokenizer.name,
-            test_name=self.name(),
-            metrics={"token_count": tokenization.token_count},
-            artifacts={},
-        )
 
-
-experiment = Experiment(
-    run_config=RunConfig(baseline_tokenizer="my_model"),
-)
-
-experiment.add_model(model, name="my_model")
-experiment.add_test(EnglishTokenCountTest(label="english token count"), model="my_model")
+experiment = Experiment(run_config=RunConfig())
+experiment.add_test(EnglishTokenCountTest(MyModelDriver(model_path="my-model"), label="english token count"))
 ```
 
 If you want tiny example drivers to copy from, start here:
@@ -116,7 +110,7 @@ pip install -e .[commoncrawl]
 
 ## Run An Experiment
 
-Call `run()` after all models and tests have been added.
+Call `run()` after all tests have been added.
 
 ```python
 report = experiment.run()
@@ -139,7 +133,7 @@ Use the saved test objects for per-test output.
 test = experiment.tests[0]
 
 print(test.status)
-print(test.summary_table())
+print(test.summary)
 print(test.results)
 print(test.warnings)
 ```

@@ -76,44 +76,49 @@ class DemoDataset(BaseDatasetDriver):
 
 
 class EnglishChatTokenCountTest(BaseTestDriver):
-    def __init__(self, label: str | None = None):
-        super().__init__(label=label)
+    def __init__(self, model: BaseModelDriver, label: str | None = None):
+        super().__init__(model=model, label=label)
         self.dataset = DemoDataset()
         self.query = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
 
     def name(self) -> str:
         return "token_count"
 
-    def get_records(self) -> list[DatasetRecord]:
-        return list(self.dataset.iter_records(self.query))
+    def run(self, context: TestContext) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        if not records:
+            self.warnings.append("No dataset records matched the test query.")
+            return
 
-    def run_case(
-        self,
-        tokenizer: BaseModelDriver,
-        record: DatasetRecord,
-        context: TestContext,
-    ) -> TestCaseResult:
-        tokenization = context.get_tokenization(tokenizer, record)
-        return TestCaseResult(
-            record_id=record.id,
-            tokenizer_name=tokenizer.name,
-            test_name=self.name(),
-            metrics={"token_count": tokenization.token_count},
-            artifacts={},
-        )
+        for record in records:
+            tokenization = context.get_tokenization(self.model, record)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
+
+        average = sum(result.metrics["token_count"] for result in self.results) / len(self.results)
+        self.summary = [
+            {
+                "test": self.label,
+                "type": self.name(),
+                "model": self.model.name,
+                "tokenizer": self.model.name,
+                "status": "completed",
+                "token_count": average,
+            }
+        ]
 
 
 def main() -> None:
-    experiment = Experiment(
-        run_config=RunConfig(
-            baseline_tokenizer="word-demo",
-            cost_per_1k_tokens={"word-demo": 0.20, "char-demo": 0.45},
-        )
-    )
-    experiment.add_model(DemoTokenizer("word-demo", mode="word"))
-    experiment.add_model(DemoTokenizer("char-demo", mode="char"))
-    experiment.add_test(EnglishChatTokenCountTest(label="english chat words"), model="word-demo")
-    experiment.add_test(EnglishChatTokenCountTest(label="english chat chars"), model="char-demo")
+    experiment = Experiment(run_config=RunConfig())
+    experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("word-demo", mode="word"), label="english chat words"))
+    experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("char-demo", mode="char"), label="english chat chars"))
 
     report = experiment.run()
     print(report.summary_table())

@@ -124,24 +124,13 @@ or copy [src/tokenteller/testsuites/template.py](D:/Development/School/asml/toke
 You must implement:
 
 - `name()`
-- `get_records()`
-- `run_case(tokenizer, record, context)`
+- `run(context)`
 
-`run_case(...)` must return a `TestCaseResult`.
+Inside `run(...)`, store your own:
 
-Useful fields:
-
-- `metrics`: numbers or summary values
-- `artifacts`: extra detail like tokens or spans
-
-The base class already handles:
-
-- storing status
-- storing results
-- building summary rows
-- printing a readable summary
-- comparing two finished tests
-- running the records returned by `get_records()`
+- `results`
+- `summary`
+- `warnings`
 
 ## Constructor Parameters
 
@@ -152,7 +141,7 @@ Example:
 
 ```python
 model = MyModelDriver(model_path="my.model")
-test = MyTestDriver(label="Hindi prompts")
+test = MyTestDriver(model=model, label="Hindi prompts")
 ```
 
 ## Minimal Workflow
@@ -172,34 +161,31 @@ from tokenteller.testsuites.base import BaseTestDriver
 
 
 class EnglishTokenCountTest(BaseTestDriver):
-    def __init__(self, label: str | None = None):
-        super().__init__(label=label)
+    def __init__(self, model, label: str | None = None):
+        super().__init__(model=model, label=label)
         self.dataset = MyDatasetDriver()
         self.query = DatasetQuery(limit=25)
 
     def name(self) -> str:
         return "token_count"
 
-    def get_records(self) -> list[DatasetRecord]:
-        return list(self.dataset.iter_records(self.query))
-
-    def run_case(self, tokenizer, record, context: TestContext) -> TestCaseResult:
-        tokenization = context.get_tokenization(tokenizer, record)
-        return TestCaseResult(
-            record_id=record.id,
-            tokenizer_name=tokenizer.name,
-            test_name=self.name(),
-            metrics={"token_count": tokenization.token_count},
-            artifacts={},
-        )
+    def run(self, context: TestContext) -> None:
+        records = list(self.dataset.iter_records(self.query))
+        for record in records:
+            tokenization = context.get_tokenization(self.model, record)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
 
 
 experiment = Experiment()
-experiment.add_model(MyModelDriver(model_path="my.model"), name="my_model")
-experiment.add_test(
-    EnglishTokenCountTest(label="english sample"),
-    model="my_model",
-)
+experiment.add_test(EnglishTokenCountTest(MyModelDriver(model_path="my.model"), label="english sample"))
 
 report = experiment.run()
 ```
@@ -211,7 +197,7 @@ For this project, keep drivers simple:
 - one file per model
 - one file per dataset
 - load things in `__init__()`
-- do the real work in one required method
+- do the real work in `run()`
 - add helper methods only if you actually need them
 
 For remote datasets such as Common Crawl, keep the query object generic inside

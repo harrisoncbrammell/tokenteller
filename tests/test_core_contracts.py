@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestContext
+from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
 from tokenteller.drivers.datasets import CommonCrawlDatasetDriver
 from tokenteller.drivers.models import SentencePieceModelDriver
 from tokenteller.testsuites.base import BaseTestDriver
-from tokenteller.testsuites.metrics import TokenCountTest
 
 from .fakes import FakeDatasetDriver, FakeTokenizerDriver
 
@@ -138,29 +137,26 @@ def test_sentencepiece_driver_imports_and_is_optional():
     assert driver.decode(encoded.token_ids)
 
 
-def test_base_test_driver_parallel_batch_preserves_input_order():
-    # This fake test adds delays so futures finish out of order.
-    class OrderedEchoTest(BaseTestDriver):
+def test_base_test_driver_owns_model_and_results():
+    class EchoTest(BaseTestDriver):
         def name(self) -> str:
-            return "ordered_echo"
+            return "echo"
 
-        def run_case(self, tokenizer, record, context):
-            # Delay two records to force out-of-order completion.
-            import time
+        def run(self, context: TestContext) -> None:
+            record = DatasetRecord(id="1", text="alpha beta")
+            tokenization = context.get_tokenization(self.model, record)
+            self.results = [
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            ]
 
-            if record.id == "1":
-                time.sleep(0.03)
-            if record.id == "2":
-                time.sleep(0.01)
-            return TokenCountTest().run_case(tokenizer, record, context)
+    test = EchoTest(FakeTokenizerDriver("echo-model"))
+    test.run(TestContext(run_config=RunConfig()))
 
-    records = [
-        DatasetRecord(id="1", text="alpha beta"),
-        DatasetRecord(id="2", text="gamma"),
-        DatasetRecord(id="3", text="delta epsilon zeta"),
-    ]
-    context = TestContext(run_config=RunConfig(max_workers=3))
-
-    results = OrderedEchoTest().run_batch(FakeTokenizerDriver("parallel-fake"), records, context)
-
-    assert [result.record_id for result in results] == ["1", "2", "3"]
+    assert test.model.name == "echo-model"
+    assert test.results[0].metrics["token_count"] == 2

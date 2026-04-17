@@ -14,31 +14,26 @@ class TestDriverTemplate(BaseTestDriver):
     - ``compression_test.py``
     """
 
-    def __init__(self, label: str | None = None):
-        super().__init__(label=label)
+    def __init__(self, model: BaseModelDriver, label: str | None = None):
+        super().__init__(model=model, label=label)
         # TODO: create the dataset driver and query for this test here
 
     def name(self) -> str:
         # Return a short stable name for this test type.
         return "my_test"
 
-    def get_records(self) -> list[DatasetRecord]:
+    def run(self, context: TestContext) -> None:
+        records: list[DatasetRecord] = []
         # TODO: fetch the dataset records this test should run on
-        raise NotImplementedError
 
-    def run_case(
-        self,
-        tokenizer: BaseModelDriver,
-        record: DatasetRecord,
-        context: TestContext,
-    ) -> TestCaseResult:
-        # TODO: compute a metric using tokenizer and record
-        tokenization = context.get_tokenization(tokenizer, record)
-
-        return TestCaseResult(
-            record_id=record.id,
-            tokenizer_name=tokenizer.name,
-            test_name=self.name(),
-            metrics={"token_count": tokenization.token_count},
-            artifacts={},
-        )
+        for record in records:
+            tokenization = context.get_tokenization(self.model, record)
+            self.results.append(
+                TestCaseResult(
+                    record_id=record.id,
+                    tokenizer_name=self.model.name,
+                    test_name=self.name(),
+                    metrics={"token_count": tokenization.token_count},
+                    artifacts={},
+                )
+            )
