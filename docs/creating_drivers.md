@@ -124,6 +124,7 @@ or copy [src/tokenteller/testsuites/template.py](D:/Development/School/asml/toke
 You must implement:
 
 - `name()`
+- `get_records()`
 - `run_case(tokenizer, record, context)`
 
 `run_case(...)` must return a `TestCaseResult`.
@@ -140,7 +141,7 @@ The base class already handles:
 - building summary rows
 - printing a readable summary
 - comparing two finished tests
-- running records in parallel
+- running the records returned by `get_records()`
 
 ## Constructor Parameters
 
@@ -151,33 +152,53 @@ Example:
 
 ```python
 model = MyModelDriver(model_path="my.model")
-dataset = MyDatasetDriver()
 test = MyTestDriver(label="Hindi prompts")
 ```
 
 ## Minimal Workflow
 
 1. Copy a template.
-2. Fill in the required method.
-3. Create the driver object directly.
-4. Add it to an `Experiment`.
+2. Create the dataset driver and query inside the test.
+3. Fill in the required methods.
+4. Add the test to an `Experiment`.
 5. Run the experiment.
 
 Example:
 
 ```python
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery
-from tokenteller.testsuites.metrics import TokenCountTest
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult, TestContext
+from tokenteller.testsuites.base import BaseTestDriver
+
+
+class EnglishTokenCountTest(BaseTestDriver):
+    def __init__(self, label: str | None = None):
+        super().__init__(label=label)
+        self.dataset = MyDatasetDriver()
+        self.query = DatasetQuery(limit=25)
+
+    def name(self) -> str:
+        return "token_count"
+
+    def get_records(self) -> list[DatasetRecord]:
+        return list(self.dataset.iter_records(self.query))
+
+    def run_case(self, tokenizer, record, context: TestContext) -> TestCaseResult:
+        tokenization = context.get_tokenization(tokenizer, record)
+        return TestCaseResult(
+            record_id=record.id,
+            tokenizer_name=tokenizer.name,
+            test_name=self.name(),
+            metrics={"token_count": tokenization.token_count},
+            artifacts={},
+        )
+
 
 experiment = Experiment()
 experiment.add_model(MyModelDriver(model_path="my.model"), name="my_model")
-experiment.add_dataset(MyDatasetDriver(), name="my_dataset")
 experiment.add_test(
-    TokenCountTest(label="english sample"),
+    EnglishTokenCountTest(label="english sample"),
     model="my_model",
-    dataset="my_dataset",
-    query=DatasetQuery(limit=25),
 )
 
 report = experiment.run()
@@ -193,10 +214,10 @@ For this project, keep drivers simple:
 - do the real work in one required method
 - add helper methods only if you actually need them
 
-For remote datasets such as Common Crawl, keep the query object generic. It is
-better to reuse `DatasetQuery(filters=...)` and let the driver translate a few
-plain keys like `domain`, `url`, or `status` than to create a separate query
-class just for one backend.
+For remote datasets such as Common Crawl, keep the query object generic inside
+the test. It is better to reuse `DatasetQuery(filters=...)` and let the driver
+translate a few plain keys like `domain`, `url`, or `status` than to create a
+separate query class just for one backend.
 
 ## Query Shape
 

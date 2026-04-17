@@ -12,37 +12,47 @@ pip install -e .
 
 ## Create An Experiment
 
-Build your model and dataset driver objects first, then add them to an `Experiment`.
+Build your model driver objects first, then add self-contained tests to an `Experiment`.
 
 ```python
 from my_project.my_dataset_driver import MyDatasetDriver
 from my_project.my_model_driver import MyModelDriver
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, RunConfig
-from tokenteller.testsuites.metrics import FragmentationTest, TokenCountTest
+from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
+from tokenteller.testsuites.base import BaseTestDriver
 
 model = MyModelDriver(model_path="my-model")
-dataset = MyDatasetDriver()
+
+
+class EnglishTokenCountTest(BaseTestDriver):
+    def __init__(self, label: str | None = None):
+        super().__init__(label=label)
+        self.dataset = MyDatasetDriver()
+        self.query = DatasetQuery(filters={"language": "en"}, limit=50)
+
+    def name(self) -> str:
+        return "token_count"
+
+    def get_records(self) -> list[DatasetRecord]:
+        return list(self.dataset.iter_records(self.query))
+
+    def run_case(self, tokenizer, record, context: TestContext) -> TestCaseResult:
+        tokenization = context.get_tokenization(tokenizer, record)
+        return TestCaseResult(
+            record_id=record.id,
+            tokenizer_name=tokenizer.name,
+            test_name=self.name(),
+            metrics={"token_count": tokenization.token_count},
+            artifacts={},
+        )
+
 
 experiment = Experiment(
     run_config=RunConfig(baseline_tokenizer="my_model"),
 )
 
 experiment.add_model(model, name="my_model")
-experiment.add_dataset(dataset, name="my_dataset")
-
-experiment.add_test(
-    TokenCountTest(label="english token count"),
-    model="my_model",
-    dataset="my_dataset",
-    query=DatasetQuery(filters={"language": "en"}, limit=50),
-)
-experiment.add_test(
-    FragmentationTest(label="english fragmentation"),
-    model="my_model",
-    dataset="my_dataset",
-    query=DatasetQuery(filters={"language": "en"}, limit=50),
-)
+experiment.add_test(EnglishTokenCountTest(label="english token count"), model="my_model")
 ```
 
 If you want tiny example drivers to copy from, start here:
@@ -106,7 +116,7 @@ pip install -e .[commoncrawl]
 
 ## Run An Experiment
 
-Call `run()` after all models, datasets, and tests have been added.
+Call `run()` after all models and tests have been added.
 
 ```python
 report = experiment.run()

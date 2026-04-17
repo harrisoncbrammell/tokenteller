@@ -12,6 +12,9 @@ class TokenCountTest(BaseTestDriver):
         # Return the stable test name used in summaries.
         return "token_count"
 
+    def get_records(self) -> list[DatasetRecord]:
+        raise NotImplementedError("Rewrite this test to fetch its own dataset records.")
+
     def run_case(
         self,
         tokenizer: BaseModelDriver,
@@ -35,6 +38,9 @@ class FragmentationTest(BaseTestDriver):
     def name(self) -> str:
         # Return the stable test name used in summaries.
         return "fragmentation"
+
+    def get_records(self) -> list[DatasetRecord]:
+        raise NotImplementedError("Rewrite this test to fetch its own dataset records.")
 
     def run_case(
         self,
@@ -65,6 +71,9 @@ class NSLTest(BaseTestDriver):
     def name(self) -> str:
         # Return the stable test name used in summaries.
         return "nsl"
+
+    def get_records(self) -> list[DatasetRecord]:
+        raise NotImplementedError("Rewrite this test to fetch its own dataset records.")
 
     def run_case(
         self,
@@ -105,6 +114,9 @@ class CostEstimateTest(BaseTestDriver):
     def name(self) -> str:
         # Return the stable test name used in summaries.
         return "cost"
+
+    def get_records(self) -> list[DatasetRecord]:
+        raise NotImplementedError("Rewrite this test to fetch its own dataset records.")
 
     def run_case(
         self,

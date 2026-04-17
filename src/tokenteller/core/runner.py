@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .types import DatasetQuery, RunConfig, TestContext, TestRunReport
-from ..drivers.datasets.base import BaseDatasetDriver
+from .types import RunConfig, TestContext, TestRunReport
 from ..drivers.models.base import BaseModelDriver
 from ..testsuites.base import BaseTestDriver
 
@@ -15,7 +14,6 @@ class Experiment:
         run_config: RunConfig | None = None,
     ):
         self.models: dict[str, BaseModelDriver] = {}
-        self.datasets: dict[str, BaseDatasetDriver] = {}
         self.run_config = run_config or RunConfig()
         self.tests: list[BaseTestDriver] = []
 
@@ -24,26 +22,21 @@ class Experiment:
         self.models[name or model.name] = model
         return self
 
-    def add_dataset(self, dataset: BaseDatasetDriver, *, name: str | None = None) -> "Experiment":
-        """Add a fully constructed dataset driver object."""
-        self.datasets[name or dataset.name] = dataset
-        return self
-
     def add_test(
         self,
         test: BaseTestDriver,
         *,
         model: str,
-        dataset: str,
-        query: DatasetQuery | None = None,
     ) -> "Experiment":
-        """Bind one test object to one model and one dataset."""
+        """Attach one test object to one model."""
         if model not in self.models:
             raise KeyError(f"Unknown model '{model}'. Add it before adding tests.")
-        if dataset not in self.datasets:
-            raise KeyError(f"Unknown dataset '{dataset}'. Add it before adding tests.")
 
-        test.bind(model_name=model, dataset_name=dataset, query=query or DatasetQuery())
+        test.model_name = model
+        test.status = "not_run"
+        test.results = []
+        test.summary = []
+        test.warnings = []
         self.tests.append(test)
         return self
 
@@ -57,16 +50,12 @@ class Experiment:
         warnings: list[str] = []
         for test in self.tests:
             model = self.models[test.model_name]
-            dataset = self.datasets[test.dataset_name]
-            records = list(dataset.iter_records(test.query))
             context = TestContext(
                 run_config=self.run_config,
                 models=self.models,
             )
 
-            if not records:
-                context.warnings.append("No dataset records matched the provided query.")
-            test_results = test.run_batch(model, records, context)
+            test_results = test.run(model, context)
             test.store_results(results=test_results, warnings=context.warnings)
             summary.extend(test.summary_rows())
             results.extend(test.results)

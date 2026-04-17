@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from statistics import mean
 
-from ..core.types import DatasetQuery, DatasetRecord, TestCaseResult, TestContext
+from ..core.types import DatasetRecord, TestCaseResult, TestContext
 from ..core.utils import render_table
 from ..drivers.models.base import BaseModelDriver
 
@@ -17,8 +16,6 @@ class BaseTestDriver(ABC):
         # Tests keep their own run state so printing one object is useful.
         self.label = label or self.name()
         self.model_name: str | None = None
-        self.dataset_name: str | None = None
-        self.query = DatasetQuery()
         self.status = "not_run"
         self.results: list[TestCaseResult] = []
         self.summary: list[dict[str, object]] = []
@@ -39,22 +36,9 @@ class BaseTestDriver(ABC):
         """Run the test on one tokenizer / one record pair."""
         raise NotImplementedError
 
-    def bind(
-        self,
-        *,
-        model_name: str,
-        dataset_name: str,
-        query: DatasetQuery | None = None,
-    ) -> "BaseTestDriver":
-        """Attach the test to one model and one dataset inside an experiment."""
-        self.model_name = model_name
-        self.dataset_name = dataset_name
-        self.query = query or DatasetQuery()
-        self.status = "not_run"
-        self.results = []
-        self.summary = []
-        self.warnings = []
-        return self
+    def get_records(self) -> Sequence[DatasetRecord]:
+        """Build or fetch the dataset records used by this test."""
+        raise NotImplementedError
 
     def run_batch(
         self,
@@ -62,26 +46,19 @@ class BaseTestDriver(ABC):
         records: Sequence[DatasetRecord],
         context: TestContext,
     ) -> list[TestCaseResult]:
-        """
-        Run many records in parallel.
+        """Run the test on each record in order."""
+        return [self.run_case(tokenizer, record, context) for record in records]
 
-        Test drivers only need to implement run_case(); this shared helper takes
-        care of the threading and keeps the results in input order.
-        """
-        max_workers = context.run_config.max_workers or min(32, (len(records) or 1) + 4)
-        if max_workers <= 1 or len(records) <= 1:
-            return [self.run_case(tokenizer, record, context) for record in records]
-
-        ordered_results: list[TestCaseResult | None] = [None] * len(records)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(self.run_case, tokenizer, record, context): index
-                for index, record in enumerate(records)
-            }
-            for future in as_completed(futures):
-                ordered_results[futures[future]] = future.result()
-
-        return [result for result in ordered_results if result is not None]
+    def run(
+        self,
+        tokenizer: BaseModelDriver,
+        context: TestContext,
+    ) -> list[TestCaseResult]:
+        """Fetch records for this test and run the cases."""
+        records = list(self.get_records())
+        if not records:
+            context.warnings.append("No dataset records matched the test query.")
+        return self.run_batch(tokenizer, records, context)
 
     def store_results(
         self,
@@ -105,7 +82,6 @@ class BaseTestDriver(ABC):
             "type": self.name(),
             "model": self.model_name or "",
             "tokenizer": self.model_name or "",
-            "dataset": self.dataset_name or "",
             "status": self.status,
         }
         if self.status == "not_run":
@@ -155,7 +131,6 @@ class BaseTestDriver(ABC):
             "type": self.name(),
             "model": self.model_name or "",
             "tokenizer": self.model_name or "",
-            "dataset": self.dataset_name or "",
             "status": self.status,
         }
         metrics: dict[str, list[float]] = {}

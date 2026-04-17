@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from threading import Lock
 from typing import Any
 
 from .utils import render_table
@@ -42,7 +41,6 @@ class TokenizationResult:
 class RunConfig:
     """Small group of experiment-wide settings."""
 
-    max_workers: int | None = None
     baseline_tokenizer: str | None = None
     cost_per_1k_tokens: dict[str, float] = field(default_factory=dict)
 
@@ -79,7 +77,6 @@ class TestContext:
     models: dict[str, Any] = field(default_factory=dict)
     tokenization_cache: dict[tuple[str, str], TokenizationResult] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
-    _cache_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     def get_tokenization(self, tokenizer: Any, record: DatasetRecord) -> TokenizationResult:
         """Cache tokenization results so multiple tests do not recompute them."""
@@ -88,11 +85,6 @@ class TestContext:
         if cached is not None:
             return cached
 
-        # Lock only around the cache write path so threads can share results safely.
-        with self._cache_lock:
-            cached = self.tokenization_cache.get(key)
-            if cached is not None:
-                return cached
-            result = tokenizer.encode(record.text)
-            self.tokenization_cache[key] = result
-            return result
+        result = tokenizer.encode(record.text)
+        self.tokenization_cache[key] = result
+        return result

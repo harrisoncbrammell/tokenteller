@@ -16,11 +16,15 @@ class TestDriverTemplate(BaseTestDriver):
 
     def __init__(self, label: str | None = None):
         super().__init__(label=label)
-        # TODO: store any extra setup for this test here
+        # TODO: create the dataset driver and query for this test here
 
     def name(self) -> str:
         # Return a short stable name for this test type.
         return "my_test"
+
+    def get_records(self) -> list[DatasetRecord]:
+        # TODO: fetch the dataset records this test should run on
+        raise NotImplementedError
 
     def run_case(
         self,
@@ -38,7 +42,3 @@ class TestDriverTemplate(BaseTestDriver):
             metrics={"token_count": tokenization.token_count},
             artifacts={},
         )
-
-    def compare(self, other: "TestDriverTemplate") -> str:
-        # Optional: override this if a custom comparison view makes sense.
-        return super().compare(other)

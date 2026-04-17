@@ -1,10 +1,40 @@
 from __future__ import annotations
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig
-from tokenteller.testsuites.metrics import CostEstimateTest, FragmentationTest, NSLTest, TokenCountTest
+from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
+from tokenteller.testsuites.base import BaseTestDriver
 
 from .fakes import FakeDatasetDriver, FakeTokenizerDriver
+
+
+class EnglishTokenCountTest(BaseTestDriver):
+    def __init__(self, label: str | None = None):
+        super().__init__(label=label)
+        self.dataset = FakeDatasetDriver(
+            name="custom",
+            records=[
+                DatasetRecord(id="1", text="hello world", categories={"language": "en", "domain": "chat"}),
+                DatasetRecord(id="2", text="à¤¨à¤®à¤¸à¥à¤† à¤¦à¥à¤¨à¤¿à¤¯à¤¾", categories={"language": "hi", "domain": "chat"}),
+                DatasetRecord(id="3", text="goodbye friend", categories={"language": "en", "domain": "docs"}),
+            ],
+        )
+        self.query = DatasetQuery(filters={"language": "en"}, limit=2)
+
+    def name(self) -> str:
+        return "token_count"
+
+    def get_records(self) -> list[DatasetRecord]:
+        return list(self.dataset.iter_records(self.query))
+
+    def run_case(self, tokenizer, record, context: TestContext) -> TestCaseResult:
+        tokenization = context.get_tokenization(tokenizer, record)
+        return TestCaseResult(
+            record_id=record.id,
+            tokenizer_name=tokenizer.name,
+            test_name=self.name(),
+            metrics={"token_count": tokenization.token_count},
+            artifacts={},
+        )
 
 
 def test_experiment_end_to_end_returns_summary():

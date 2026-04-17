@@ -8,10 +8,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TokenizationResult
+from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext, TokenizationResult
 from tokenteller.drivers.datasets.base import BaseDatasetDriver
 from tokenteller.drivers.models.base import BaseModelDriver
-from tokenteller.testsuites.metrics import FragmentationTest, NSLTest, TokenCountTest
+from tokenteller.testsuites.base import BaseTestDriver
 
 
 class DemoTokenizer(BaseModelDriver):
@@ -75,6 +75,34 @@ class DemoDataset(BaseDatasetDriver):
         return records[: query.limit]
 
 
+class EnglishChatTokenCountTest(BaseTestDriver):
+    def __init__(self, label: str | None = None):
+        super().__init__(label=label)
+        self.dataset = DemoDataset()
+        self.query = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
+
+    def name(self) -> str:
+        return "token_count"
+
+    def get_records(self) -> list[DatasetRecord]:
+        return list(self.dataset.iter_records(self.query))
+
+    def run_case(
+        self,
+        tokenizer: BaseModelDriver,
+        record: DatasetRecord,
+        context: TestContext,
+    ) -> TestCaseResult:
+        tokenization = context.get_tokenization(tokenizer, record)
+        return TestCaseResult(
+            record_id=record.id,
+            tokenizer_name=tokenizer.name,
+            test_name=self.name(),
+            metrics={"token_count": tokenization.token_count},
+            artifacts={},
+        )
+
+
 def main() -> None:
     experiment = Experiment(
         run_config=RunConfig(
@@ -84,12 +112,8 @@ def main() -> None:
     )
     experiment.add_model(DemoTokenizer("word-demo", mode="word"))
     experiment.add_model(DemoTokenizer("char-demo", mode="char"))
-    experiment.add_dataset(DemoDataset())
-
-    english_chat = DatasetQuery(filters={"language": "en", "domain": "chat"}, limit=10)
-    for model_name in ("word-demo", "char-demo"):
-        for test in (TokenCountTest(), FragmentationTest(), NSLTest()):
-            experiment.add_test(test, model=model_name, dataset="demo", query=english_chat)
+    experiment.add_test(EnglishChatTokenCountTest(label="english chat words"), model="word-demo")
+    experiment.add_test(EnglishChatTokenCountTest(label="english chat chars"), model="char-demo")
 
     report = experiment.run()
     print(report.summary_table())
