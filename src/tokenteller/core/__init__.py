@@ -3,9 +3,7 @@ from .runner import Experiment
 from .types import (
     DatasetQuery,
     DatasetRecord,
-    RunConfig,
     TestCaseResult,
-    TestContext,
     TestRunReport,
     TokenizationResult,
 )
@@ -22,9 +20,7 @@ __all__ = [
     "DatasetQuery",
     "DatasetRecord",
     "Experiment",
-    "RunConfig",
     "TestCaseResult",
-    "TestContext",
     "TestRunReport",
     "TokenizationResult",
 ]

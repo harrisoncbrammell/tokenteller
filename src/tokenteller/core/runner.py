@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-from .types import RunConfig, TestContext, TestRunReport
+from .types import TestRunReport
 from ..testsuites.base import BaseTestDriver
 
 
 class Experiment:
-    """Small orchestration object that holds tests and runs them."""
-
-    def __init__(
-        self,
-        *,
-        run_config: RunConfig | None = None,
-    ):
-        self.run_config = run_config or RunConfig()
+    def __init__(self):
         self.tests: list[BaseTestDriver] = []
 
     def add_test(self, test: BaseTestDriver) -> "Experiment":
-        """Attach one fully configured test object."""
         self.tests.append(test)
         return self
 
@@ -34,9 +26,7 @@ class Experiment:
             test.summary = []
             test.warnings = []
 
-            context = TestContext(run_config=self.run_config)
-            test.run(context)
-            test.warnings.extend(context.warnings)
+            test.run()
             test.status = "completed"
 
             summary.extend(test.summary or [self._default_summary_row(test)])

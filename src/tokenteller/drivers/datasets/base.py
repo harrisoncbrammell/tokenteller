@@ -19,12 +19,6 @@ class BaseDatasetDriver(ABC):
         raise NotImplementedError
 
     def count(self, query: DatasetQuery) -> int | None:
-        """
-        Default count implementation for simple datasets.
-
-        Drivers can override this if counting can be done more efficiently than
-        fully iterating through the records.
-        """
         return len(list(self.iter_records(query)))
 
 

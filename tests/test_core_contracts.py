@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
 from tokenteller.drivers.datasets import CommonCrawlDatasetDriver
 from tokenteller.drivers.models import SentencePieceModelDriver
 from tokenteller.testsuites.base import BaseTestDriver
@@ -22,9 +22,6 @@ def test_tokenizer_helper_methods_work():
 
     assert [result.token_count for result in batch] == [2, 1]
     assert tokenizer.token_count("one two") == 2
-    stats = tokenizer.fragmentation_stats("hello world")
-    assert stats["word_count"] == 2
-    assert stats["pieces_per_word"] == 1.0
 
 
 def test_dataset_driver_supports_filters_and_deterministic_sampling():
@@ -142,9 +139,9 @@ def test_base_test_driver_owns_model_and_results():
         def name(self) -> str:
             return "echo"
 
-        def run(self, context: TestContext) -> None:
+        def run(self) -> None:
             record = DatasetRecord(id="1", text="alpha beta")
-            tokenization = context.get_tokenization(self.model, record)
+            tokenization = self.model.encode(record.text)
             self.results = [
                 TestCaseResult(
                     record_id=record.id,
@@ -156,7 +153,7 @@ def test_base_test_driver_owns_model_and_results():
             ]
 
     test = EchoTest(FakeTokenizerDriver("echo-model"))
-    test.run(TestContext(run_config=RunConfig()))
+    test.run()
 
     assert test.model.name == "echo-model"
     assert test.results[0].metrics["token_count"] == 2

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
 from tokenteller.testsuites.base import BaseTestDriver
+from tokenteller.testsuites.fragmentation import FragmentationTest
 
 from .fakes import FakeDatasetDriver, FakeTokenizerDriver
 
@@ -23,14 +24,14 @@ class EnglishTokenCountTest(BaseTestDriver):
     def name(self) -> str:
         return "token_count"
 
-    def run(self, context: TestContext) -> None:
+    def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
         if not records:
             self.warnings.append("No dataset records matched the test query.")
             return
 
         for record in records:
-            tokenization = context.get_tokenization(self.model, record)
+            tokenization = self.model.encode(record.text)
             self.results.append(
                 TestCaseResult(
                     record_id=record.id,
@@ -55,7 +56,7 @@ class EnglishTokenCountTest(BaseTestDriver):
 
 
 def test_experiment_end_to_end_returns_summary():
-    experiment = Experiment(run_config=RunConfig())
+    experiment = Experiment()
     experiment.add_test(EnglishTokenCountTest(FakeTokenizerDriver("tt-word", mode="word"), label="word count"))
     experiment.add_test(EnglishTokenCountTest(FakeTokenizerDriver("tt-char", mode="char"), label="char count"))
 
@@ -94,3 +95,23 @@ def test_compare_raises_by_default():
         assert "does not support comparisons" in str(error)
     else:
         raise AssertionError("compare() should raise by default.")
+
+
+def test_fragmentation_test_calculates_word_piece_stats():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"})],
+    )
+
+    test = FragmentationTest(
+        FakeTokenizerDriver("hybrid", mode="hybrid"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="fragmentation demo",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["pieces_per_word"] > 1.0
+    assert report.summary[0]["max_pieces_per_word"] == 2
+    assert test.results[0].artifacts["word_fragments"][0]["tokens"] == ["fra", "gmentation"]

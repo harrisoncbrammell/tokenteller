@@ -18,7 +18,7 @@ Build self-contained tests first, then add them to an `Experiment`.
 from my_project.my_dataset_driver import MyDatasetDriver
 from my_project.my_model_driver import MyModelDriver
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
 from tokenteller.testsuites.base import BaseTestDriver
 
 class EnglishTokenCountTest(BaseTestDriver):
@@ -30,10 +30,10 @@ class EnglishTokenCountTest(BaseTestDriver):
     def name(self) -> str:
         return "token_count"
 
-    def run(self, context: TestContext) -> None:
+    def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
         for record in records:
-            tokenization = context.get_tokenization(self.model, record)
+            tokenization = self.model.encode(record.text)
             self.results.append(
                 TestCaseResult(
                     record_id=record.id,
@@ -45,7 +45,7 @@ class EnglishTokenCountTest(BaseTestDriver):
             )
 
 
-experiment = Experiment(run_config=RunConfig())
+experiment = Experiment()
 experiment.add_test(EnglishTokenCountTest(MyModelDriver(model_path="my-model"), label="english token count"))
 ```
 

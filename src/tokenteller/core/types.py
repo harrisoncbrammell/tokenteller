@@ -38,14 +38,6 @@ class TokenizationResult:
 
 
 @dataclass(slots=True)
-class RunConfig:
-    """Small group of experiment-wide settings."""
-
-    baseline_tokenizer: str | None = None
-    cost_per_1k_tokens: dict[str, float] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
 class TestCaseResult:
     """Result of running one test on one record with one model."""
 
@@ -67,24 +59,3 @@ class TestRunReport:
     def summary_table(self) -> str:
         """Render the experiment summary rows as a plain text table."""
         return render_table(self.summary)
-
-
-@dataclass
-class TestContext:
-    """Shared per-test-run state used while processing many records."""
-
-    run_config: RunConfig
-    models: dict[str, Any] = field(default_factory=dict)
-    tokenization_cache: dict[tuple[str, str], TokenizationResult] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
-
-    def get_tokenization(self, tokenizer: Any, record: DatasetRecord) -> TokenizationResult:
-        """Cache tokenization results so multiple tests do not recompute them."""
-        key = (tokenizer.name, record.id)
-        cached = self.tokenization_cache.get(key)
-        if cached is not None:
-            return cached
-
-        result = tokenizer.encode(record.text)
-        self.tokenization_cache[key] = result
-        return result

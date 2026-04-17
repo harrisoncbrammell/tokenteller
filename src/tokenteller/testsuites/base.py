@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ..core.types import TestCaseResult, TestContext
+from ..core.types import TestCaseResult
 from ..drivers.models.base import BaseModelDriver
 
 
@@ -23,7 +23,7 @@ class BaseTestDriver(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def run(self, context: TestContext) -> None:
+    def run(self) -> None:
         """Run the test and save results on the object."""
         raise NotImplementedError
 

@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, RunConfig, TestCaseResult, TestContext, TokenizationResult
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult, TokenizationResult
 from tokenteller.drivers.datasets.base import BaseDatasetDriver
 from tokenteller.drivers.models.base import BaseModelDriver
 from tokenteller.testsuites.base import BaseTestDriver
@@ -84,14 +84,14 @@ class EnglishChatTokenCountTest(BaseTestDriver):
     def name(self) -> str:
         return "token_count"
 
-    def run(self, context: TestContext) -> None:
+    def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
         if not records:
             self.warnings.append("No dataset records matched the test query.")
             return
 
         for record in records:
-            tokenization = context.get_tokenization(self.model, record)
+            tokenization = self.model.encode(record.text)
             self.results.append(
                 TestCaseResult(
                     record_id=record.id,
@@ -116,7 +116,7 @@ class EnglishChatTokenCountTest(BaseTestDriver):
 
 
 def main() -> None:
-    experiment = Experiment(run_config=RunConfig())
+    experiment = Experiment()
     experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("word-demo", mode="word"), label="english chat words"))
     experiment.add_test(EnglishChatTokenCountTest(DemoTokenizer("char-demo", mode="char"), label="english chat chars"))
 

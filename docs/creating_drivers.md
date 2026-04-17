@@ -124,7 +124,7 @@ or copy [src/tokenteller/testsuites/template.py](D:/Development/School/asml/toke
 You must implement:
 
 - `name()`
-- `run(context)`
+- `run()`
 
 Inside `run(...)`, store your own:
 
@@ -156,7 +156,7 @@ Example:
 
 ```python
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult, TestContext
+from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
 from tokenteller.testsuites.base import BaseTestDriver
 
 
@@ -169,10 +169,10 @@ class EnglishTokenCountTest(BaseTestDriver):
     def name(self) -> str:
         return "token_count"
 
-    def run(self, context: TestContext) -> None:
+    def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
         for record in records:
-            tokenization = context.get_tokenization(self.model, record)
+            tokenization = self.model.encode(record.text)
             self.results.append(
                 TestCaseResult(
                     record_id=record.id,
