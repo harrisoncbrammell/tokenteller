@@ -1,0 +1,8 @@
+datasets>=2.0
+transformers>=4.0
+
+[commoncrawl]
+cdx-toolkit>=0.9.38
+
+[dev]
+pytest>=8.0

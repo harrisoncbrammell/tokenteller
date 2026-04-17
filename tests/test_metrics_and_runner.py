@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from tokenteller import Experiment
 from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
+from tokenteller.testsuites import (
+    CompressionRatioTest,
+    CostEstimateTest,
+    FertilityRateTest,
+    MeanTokensPerSentenceTest,
+    NSLTest,
+    OOVRateTest,
+    TokenCountTest,
+)
 from tokenteller.testsuites.base import BaseTestDriver
 from tokenteller.testsuites.fragmentation import FragmentationTest
 
@@ -115,3 +124,162 @@ def test_fragmentation_test_calculates_word_piece_stats():
     assert report.summary[0]["pieces_per_word"] > 1.0
     assert report.summary[0]["max_pieces_per_word"] == 2
     assert test.results[0].artifacts["word_fragments"][0]["tokens"] == ["fra", "gmentation"]
+
+
+def test_token_count_test_keeps_token_splits():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
+    )
+
+    test = TokenCountTest(
+        FakeTokenizerDriver("word", mode="word"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="token splits",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["token_count"] == 2.0
+    assert test.results[0].artifacts["tokens"] == ["hello", "world"]
+    assert test.results[0].artifacts["text"] == "hello world"
+
+
+def test_cost_estimate_test_computes_total_cost():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
+    )
+
+    test = CostEstimateTest(
+        FakeTokenizerDriver("word", mode="word"),
+        dataset=dataset,
+        cost_per_1k_tokens=0.5,
+        query=DatasetQuery(limit=1),
+        label="cost demo",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["estimated_cost"] == 0.001
+    assert test.results[0].metrics["estimated_cost"] == 0.001
+
+
+def test_nsl_test_compares_against_baseline_model():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"})],
+    )
+
+    baseline = FakeTokenizerDriver("word", mode="word")
+    test = NSLTest(
+        FakeTokenizerDriver("hybrid", mode="hybrid"),
+        baseline_model=baseline,
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="nsl demo",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["baseline"] == "word"
+    assert report.summary[0]["nsl"] > 1.0
+
+
+def test_fragmentation_compare_renders_table():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"})],
+    )
+
+    first = FragmentationTest(
+        FakeTokenizerDriver("word", mode="word"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="word frag",
+    )
+    second = FragmentationTest(
+        FakeTokenizerDriver("hybrid", mode="hybrid"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="hybrid frag",
+    )
+
+    Experiment().add_test(first).add_test(second).run()
+    comparison = first.compare(second)
+
+    assert "pieces_per_word" in comparison
+    assert "hybrid frag" in comparison
+
+
+def test_compression_ratio_test_uses_token_count_over_char_count():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="hello", categories={"language": "en"})],
+    )
+
+    test = CompressionRatioTest(
+        FakeTokenizerDriver("char", mode="char"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="compression",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["compression_ratio"] == 1.0
+
+
+def test_oov_rate_test_defaults_to_zero_without_unknown_markers():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
+    )
+
+    test = OOVRateTest(
+        FakeTokenizerDriver("word", mode="word"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="oov",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["oov_rate"] == 0.0
+
+
+def test_fertility_rate_test_computes_tokens_per_word():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="fragmentation matters", categories={"language": "en"})],
+    )
+
+    test = FertilityRateTest(
+        FakeTokenizerDriver("hybrid", mode="hybrid"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="fertility",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["fertility_rate"] == 2.0
+
+
+def test_mean_tokens_per_sentence_test_computes_sentence_average():
+    dataset = FakeDatasetDriver(
+        name="demo",
+        records=[DatasetRecord(id="1", text="Hello world. Goodbye friend.", categories={"language": "en"})],
+    )
+
+    test = MeanTokensPerSentenceTest(
+        FakeTokenizerDriver("word", mode="word"),
+        dataset=dataset,
+        query=DatasetQuery(limit=1),
+        label="sentence mean",
+    )
+
+    report = Experiment().add_test(test).run()
+
+    assert report.summary[0]["mean_tokens_per_sentence"] == 2.0

@@ -11,15 +11,14 @@ requires-python = ">=3.11"
 authors = [
   { name = "Tokenteller Team" }
 ]
-dependencies = []
+dependencies = [
+  "datasets>=2.0",
+  "transformers>=4.0",
+]
 
 [project.optional-dependencies]
 commoncrawl = [
   "cdx-toolkit>=0.9.38",
-]
-huggingface = [
-  "datasets>=2.0",
-  "transformers>=4.0",
 ]
 dev = [
   "pytest>=8.0",

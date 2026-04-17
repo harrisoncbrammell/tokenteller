@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import re
+
 from ..core.types import DatasetQuery, TestCaseResult
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
-class TokenCountTest(BaseTestDriver):
-    """Count tokens and keep the token split for each record."""
+class MeanTokensPerSentenceTest(BaseTestDriver):
+    """Compute mean tokens per sentence from total tokens / total sentences."""
 
     def __init__(
         self,
@@ -20,7 +22,7 @@ class TokenCountTest(BaseTestDriver):
         self.query = query or DatasetQuery()
 
     def name(self) -> str:
-        return "token_count"
+        return "mean_tokens_per_sentence"
 
     def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
@@ -30,21 +32,23 @@ class TokenCountTest(BaseTestDriver):
 
         for record in records:
             tokenization = self.model.encode(record.text)
+            sentence_count = _sentence_count(record.text)
+            mean_tokens = None if sentence_count == 0 else tokenization.token_count / sentence_count
             self.results.append(
                 TestCaseResult(
                     record_id=record.id,
                     tokenizer_name=self.model.name,
                     test_name=self.name(),
-                    metrics={"token_count": tokenization.token_count},
-                    artifacts={
-                        "text": record.text,
-                        "tokens": tokenization.tokens,
-                        "token_ids": tokenization.token_ids,
-                        "offsets": tokenization.offsets,
+                    metrics={
+                        "token_count": tokenization.token_count,
+                        "sentence_count": sentence_count,
+                        "mean_tokens_per_sentence": mean_tokens,
                     },
+                    artifacts={"text": record.text, "tokens": tokenization.tokens},
                 )
             )
 
+        valid = [result.metrics["mean_tokens_per_sentence"] for result in self.results if result.metrics["mean_tokens_per_sentence"] is not None]
         self.summary = [
             {
                 "test": self.label,
@@ -52,6 +56,11 @@ class TokenCountTest(BaseTestDriver):
                 "model": self.model.name,
                 "tokenizer": self.model.name,
                 "status": "completed",
-                "token_count": sum(result.metrics["token_count"] for result in self.results) / len(self.results),
+                "mean_tokens_per_sentence": sum(valid) / len(valid) if valid else None,
             }
         ]
+
+
+def _sentence_count(text: str) -> int:
+    parts = [part.strip() for part in re.split(r"[.!?]+", text) if part.strip()]
+    return len(parts)

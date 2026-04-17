@@ -5,6 +5,7 @@ from typing import Any
 
 from ..core.types import DatasetQuery, TestCaseResult
 from ..drivers.datasets.base import BaseDatasetDriver
+from ..core.utils import render_table
 from .base import BaseTestDriver
 
 
@@ -62,6 +63,25 @@ class FragmentationTest(BaseTestDriver):
                 "max_pieces_per_word": max(result.metrics["max_pieces_per_word"] for result in self.results),
             }
         ]
+
+    def compare(self, *others: "FragmentationTest") -> str:
+        tests = (self, *others)
+        for test in tests:
+            if not isinstance(test, FragmentationTest):
+                raise TypeError("compare() requires FragmentationTest objects.")
+            if test.status != "completed" or not test.summary:
+                raise ValueError("All fragmentation tests must be completed before comparison.")
+
+        rows = [
+            {
+                "test": test.label,
+                "model": test.model.name,
+                "pieces_per_word": test.summary[0]["pieces_per_word"],
+                "max_pieces_per_word": test.summary[0]["max_pieces_per_word"],
+            }
+            for test in tests
+        ]
+        return render_table(rows)
 
 
 def _fragmentation_stats(text: str, tokenization) -> dict[str, Any]:

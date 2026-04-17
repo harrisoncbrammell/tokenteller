@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from collections import deque
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -41,22 +42,69 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
         )
 
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
-        records = (
-            self._row_to_record(row, index=index)
-            for index, row in enumerate(self.dataset, start=1)
+        filtered_records = self._iter_filtered_records(query)
+        strategy = query.sample_strategy
+        limit = query.limit
+
+        if strategy == "head":
+            if limit is None:
+                for record in filtered_records:
+                    yield record
+                return
+
+            yielded = 0
+            for record in filtered_records:
+                if yielded >= limit:
+                    break
+                yield record
+                yielded += 1
+            return
+
+        if strategy == "tail":
+            if limit is None:
+                records = list(filtered_records)
+            else:
+                records = list(deque(filtered_records, maxlen=limit))
+
+            for record in reversed(records):
+                yield record
+            return
+
+        if strategy == "random":
+            rng = random.Random(query.seed)
+
+            if limit is None:
+                records = list(filtered_records)
+                rng.shuffle(records)
+                for record in records:
+                    yield record
+                return
+
+            # Reservoir sample to keep memory bounded for streaming datasets.
+            reservoir: list[DatasetRecord] = []
+            for seen, record in enumerate(filtered_records, start=1):
+                if seen <= limit:
+                    reservoir.append(record)
+                    continue
+
+                replace_at = rng.randrange(seen)
+                if replace_at < limit:
+                    reservoir[replace_at] = record
+
+            rng.shuffle(reservoir)
+            for record in reservoir:
+                yield record
+            return
+
+        raise ValueError(
+            "Unsupported sample strategy. Expected one of: head, tail, random."
         )
-        records = [record for record in records if record is not None and self._matches(record, query.filters)]
 
-        if query.sample_strategy == "random":
-            random.Random(query.seed).shuffle(records)
-        elif query.sample_strategy == "tail":
-            records = records[::-1]
-
-        if query.limit is not None:
-            records = records[: query.limit]
-
-        for record in records:
-            yield record
+    def _iter_filtered_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        for index, row in enumerate(self.dataset, start=1):
+            record = self._row_to_record(row, index=index)
+            if record is not None and self._matches(record, query.filters):
+                yield record
 
     def _row_to_record(self, row: object, *, index: int) -> DatasetRecord | None:
         if not isinstance(row, Mapping):
