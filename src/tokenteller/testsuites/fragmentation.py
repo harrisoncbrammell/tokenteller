@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from ..core.utils import render_table
 from .base import BaseTestDriver
@@ -33,20 +33,19 @@ class FragmentationTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text, with_offsets=True)
             stats = _fragmentation_stats(record.text, tokenization)
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": stats["token_count"],
                         "word_count": stats["word_count"],
                         "pieces_per_word": stats["pieces_per_word"],
                         "max_pieces_per_word": stats["max_pieces_per_word"],
                     },
-                    artifacts={"word_fragments": stats["word_fragments"]},
+                    tokenization=tokenization,
+                    output_metadata={"fragment_count": len(stats["word_fragments"])},
                 )
             )
 

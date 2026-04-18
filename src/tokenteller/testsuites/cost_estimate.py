@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -31,18 +31,16 @@ class CostEstimateTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
             estimated_cost = tokenization.token_count / 1000.0 * self.cost_per_1k_tokens
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "estimated_cost": estimated_cost,
                     },
-                    artifacts={"text": record.text, "tokens": tokenization.tokens},
+                    tokenization=tokenization,
                 )
             )
 

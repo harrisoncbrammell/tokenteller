@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
+from tokenteller.core.types import DatasetQuery, DatasetRecord
 from tokenteller.drivers.datasets import CommonCrawlDatasetDriver
 from tokenteller.drivers.models import SentencePieceModelDriver
 from tokenteller.testsuites.base import BaseTestDriver
@@ -141,16 +141,8 @@ def test_base_test_driver_owns_model_and_results():
 
         def run(self) -> None:
             record = DatasetRecord(id="1", text="alpha beta")
-            tokenization = self.model.encode(record.text)
-            self.results = [
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
-                    metrics={"token_count": tokenization.token_count},
-                    artifacts={},
-                )
-            ]
+            tokenization = self.model.tokenize(record.text)
+            self.results = [self.make_result(record, metrics={"token_count": tokenization.token_count}, tokenization=tokenization)]
 
     test = EchoTest(FakeTokenizerDriver("echo-model"))
     test.run()

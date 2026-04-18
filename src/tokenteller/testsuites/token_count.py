@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -29,21 +29,8 @@ class TokenCountTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
-            self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
-                    metrics={"token_count": tokenization.token_count},
-                    artifacts={
-                        "text": record.text,
-                        "tokens": tokenization.tokens,
-                        "token_ids": tokenization.token_ids,
-                        "offsets": tokenization.offsets,
-                    },
-                )
-            )
+            tokenization = self.model.tokenize(record.text)
+            self.results.append(self.make_result(record, metrics={"token_count": tokenization.token_count}, tokenization=tokenization))
 
         self.summary = [
             {

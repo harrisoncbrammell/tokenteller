@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import html
 import random
 import sys
 from collections.abc import Iterable
@@ -24,6 +23,9 @@ from tokenteller.testsuites import (
     OOVRateTest,
     TokenCountTest,
 )
+
+OUTPUT_STEM = "wikipedia_single_article_tokenizer_comparison"
+RESULTS_DIR = Path(__file__).with_name("results")
 
 
 class SingleArticleDataset(BaseDatasetDriver):
@@ -61,10 +63,6 @@ def choose_random_article() -> DatasetRecord:
 
 def escape_markdown_cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", "<br>")
-
-
-def escape_html_text(value: object) -> str:
-    return html.escape(str(value))
 
 
 METRIC_LABELS = {
@@ -139,12 +137,17 @@ def pivot_summary_by_tokenizer(summary_rows: list[dict[str, object]]) -> list[di
     ]
 
 
+def metadata_rows(metadata: dict[str, object]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for key in sorted(metadata):
+        rows.append({"field": key, "value": metadata[key]})
+    return rows or [{"field": "(none)", "value": ""}]
+
+
 def build_markdown_summary(
     article_id: str,
     article_text: str,
     report_summary: list[dict[str, object]],
-    token_count_tests: list[TokenCountTest],
-    fragmentation_summary: str,
 ) -> str:
     pivoted_summary = pivot_summary_by_tokenizer(report_summary)
     metric_columns = [column for column in pivoted_summary[0] if column != "tokenizer"] if pivoted_summary else []
@@ -177,40 +180,6 @@ def build_markdown_summary(
             f"- **{display_label(column)}**: {METRIC_DESCRIPTIONS.get(column, 'Metric reported by the test summary.')}"
         )
 
-    lines.extend(
-        [
-            "",
-            "## Token splits",
-            "",
-        ]
-    )
-
-    for test in token_count_tests:
-        tokens = test.results[0].artifacts["tokens"]
-        lines.extend(
-            [
-                f"### {test.model.name}",
-                "",
-                '<div style="max-height: 320px; overflow: auto;">',
-                "",
-                f"<pre>{escape_html_text(tokens)}</pre>",
-                "",
-                "</div>",
-                "",
-            ]
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Fragmentation comparison",
-            "",
-            "```text",
-            fragmentation_summary,
-            "```",
-            "",
-        ]
-    )
     return "\n".join(lines)
 
 
@@ -233,15 +202,10 @@ def main() -> None:
     }
 
     experiment = Experiment()
-    token_count_tests: list[TokenCountTest] = []
-    fragmentation_tests: list[FragmentationTest] = []
 
     for model in models:
         token_count = TokenCountTest(model, dataset=dataset, label=f"{model.name} token count")
         fragmentation = FragmentationTest(model, dataset=dataset, label=f"{model.name} fragmentation")
-
-        token_count_tests.append(token_count)
-        fragmentation_tests.append(fragmentation)
 
         experiment.add_test(token_count)
         experiment.add_test(CompressionRatioTest(model, dataset=dataset, label=f"{model.name} compression"))
@@ -267,25 +231,21 @@ def main() -> None:
         )
 
     report = experiment.run()
-    fragmentation_summary = fragmentation_tests[0].compare(*fragmentation_tests[1:])
     markdown_summary = build_markdown_summary(
         article_id=article.id,
         article_text=article.text,
         report_summary=report.summary,
-        token_count_tests=token_count_tests,
-        fragmentation_summary=fragmentation_summary,
     )
-    output_path = Path(__file__).with_name("compare_hf_tokenizers_on_random_wikipedia_article_summary.md")
+    RESULTS_DIR.mkdir(exist_ok=True)
+    output_path = RESULTS_DIR / f"{OUTPUT_STEM}_report.md"
     output_path.write_text(markdown_summary, encoding="utf-8")
 
     print("Selected Wikipedia article:")
     print(f"Article id: {article.id}")
     print(f"Character count: {len(article.text)}")
     print()
-    print(render_table(pivot_summary_by_tokenizer(report.summary)))
-    print()
-    print("Fragmentation comparison:")
-    print(fragmentation_summary)
+    print("Article metadata:")
+    print(render_table(metadata_rows(article.metadata)))
     print()
     print(f"Markdown summary written to: {output_path}")
 

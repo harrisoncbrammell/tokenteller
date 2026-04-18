@@ -22,7 +22,7 @@ class DatasetQuery:
 
     filters: dict[str, Any] = field(default_factory=dict)
     limit: int | None = None
-    sample_strategy: str = "head"
+    sample_strategy: str = "random"
     seed: int | None = None
 
 
@@ -45,7 +45,8 @@ class TestCaseResult:
     tokenizer_name: str
     test_name: str
     metrics: dict[str, Any] = field(default_factory=dict)
-    artifacts: dict[str, Any] = field(default_factory=dict)
+    input_metadata: dict[str, Any] = field(default_factory=dict)
+    output_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -42,22 +42,33 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
         )
 
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        cached_records = self._get_cached_records(query)
+        if cached_records is not None:
+            for record in cached_records:
+                yield record
+            return
+
         filtered_records = self._iter_filtered_records(query)
         strategy = query.sample_strategy
         limit = query.limit
+        records: list[DatasetRecord]
 
         if strategy == "head":
             if limit is None:
-                for record in filtered_records:
+                records = list(filtered_records)
+                self._store_cached_records(query, records)
+                for record in records:
                     yield record
                 return
 
-            yielded = 0
+            records = []
             for record in filtered_records:
-                if yielded >= limit:
+                if len(records) >= limit:
                     break
+                records.append(record)
+            self._store_cached_records(query, records)
+            for record in records:
                 yield record
-                yielded += 1
             return
 
         if strategy == "tail":
@@ -66,7 +77,9 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
             else:
                 records = list(deque(filtered_records, maxlen=limit))
 
-            for record in reversed(records):
+            records = list(reversed(records))
+            self._store_cached_records(query, records)
+            for record in records:
                 yield record
             return
 
@@ -76,6 +89,7 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
             if limit is None:
                 records = list(filtered_records)
                 rng.shuffle(records)
+                self._store_cached_records(query, records)
                 for record in records:
                     yield record
                 return
@@ -92,6 +106,7 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
                     reservoir[replace_at] = record
 
             rng.shuffle(reservoir)
+            self._store_cached_records(query, reservoir)
             for record in reservoir:
                 yield record
             return

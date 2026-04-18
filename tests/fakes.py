@@ -83,6 +83,10 @@ class FakeDatasetDriver(BaseDatasetDriver):
         self.records = records
 
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        cached_records = self._get_cached_records(query)
+        if cached_records is not None:
+            return cached_records
+
         # Start from the full in-memory record list.
         records = self.records
         # Apply simple equality filters from the query.
@@ -104,6 +108,9 @@ class FakeDatasetDriver(BaseDatasetDriver):
             records = records[::-1]
 
         if query.limit is None:
+            self._store_cached_records(query, records)
             return records
         # Respect the requested record limit.
-        return records[: query.limit]
+        records = records[: query.limit]
+        self._store_cached_records(query, records)
+        return records

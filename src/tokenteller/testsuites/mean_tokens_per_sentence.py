@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -31,20 +31,18 @@ class MeanTokensPerSentenceTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
             sentence_count = _sentence_count(record.text)
             mean_tokens = None if sentence_count == 0 else tokenization.token_count / sentence_count
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "sentence_count": sentence_count,
                         "mean_tokens_per_sentence": mean_tokens,
                     },
-                    artifacts={"text": record.text, "tokens": tokenization.tokens},
+                    tokenization=tokenization,
                 )
             )
 

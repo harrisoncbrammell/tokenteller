@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tokenteller import Experiment
-from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
+from tokenteller.core.types import DatasetQuery, DatasetRecord
 from tokenteller.testsuites import (
     CompressionRatioTest,
     CostEstimateTest,
@@ -40,16 +40,8 @@ class EnglishTokenCountTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
-            self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
-                    metrics={"token_count": tokenization.token_count},
-                    artifacts={},
-                )
-            )
+            tokenization = self.model.tokenize(record.text)
+            self.results.append(self.make_result(record, metrics={"token_count": tokenization.token_count}, tokenization=tokenization))
 
         average = sum(result.metrics["token_count"] for result in self.results) / len(self.results)
         self.summary = [
@@ -123,10 +115,11 @@ def test_fragmentation_test_calculates_word_piece_stats():
 
     assert report.summary[0]["pieces_per_word"] > 1.0
     assert report.summary[0]["max_pieces_per_word"] == 2
-    assert test.results[0].artifacts["word_fragments"][0]["tokens"] == ["fra", "gmentation"]
+    assert test.results[0].output_metadata["fragment_count"] == 2
+    assert test.results[0].output_metadata["has_offsets"] is True
 
 
-def test_token_count_test_keeps_token_splits():
+def test_token_count_test_keeps_lightweight_metadata():
     dataset = FakeDatasetDriver(
         name="demo",
         records=[DatasetRecord(id="1", text="hello world", categories={"language": "en"})],
@@ -142,8 +135,9 @@ def test_token_count_test_keeps_token_splits():
     report = Experiment().add_test(test).run()
 
     assert report.summary[0]["token_count"] == 2.0
-    assert test.results[0].artifacts["tokens"] == ["hello", "world"]
-    assert test.results[0].artifacts["text"] == "hello world"
+    assert test.results[0].input_metadata["categories"] == {"language": "en"}
+    assert test.results[0].output_metadata["has_offsets"] is True
+    assert test.results[0].output_metadata["offset_count"] == 2
 
 
 def test_cost_estimate_test_computes_total_cost():

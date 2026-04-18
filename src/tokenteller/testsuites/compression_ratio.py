@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -29,20 +29,18 @@ class CompressionRatioTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
             char_count = len(record.text)
             compression_ratio = None if char_count == 0 else tokenization.token_count / char_count
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "char_count": char_count,
                         "compression_ratio": compression_ratio,
                     },
-                    artifacts={"text": record.text, "tokens": tokenization.tokens},
+                    tokenization=tokenization,
                 )
             )
 

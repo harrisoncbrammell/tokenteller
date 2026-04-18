@@ -1,7 +1,20 @@
-from collections.abc import Iterable
+from __future__ import annotations
 
-from tokenteller.core.types import DatasetQuery, DatasetRecord
-from tokenteller.drivers.datasets.base import BaseDatasetDriver
+from collections.abc import Iterable
+import os
+import sys
+
+if __package__ in {None, ""}:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if sys.path and os.path.abspath(sys.path[0]) == script_dir:
+        sys.path.pop(0)
+    src_root = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
+    sys.path.insert(0, src_root)
+    from tokenteller.core.types import DatasetQuery, DatasetRecord
+    from tokenteller.drivers.datasets.base import BaseDatasetDriver
+else:
+    from ...core.types import DatasetQuery, DatasetRecord
+    from .base import BaseDatasetDriver
 
 
 class DatasetDriverTemplate(BaseDatasetDriver):

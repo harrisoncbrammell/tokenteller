@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -44,7 +44,7 @@ class OOVRateTest(BaseTestDriver):
                 unknown_tokens.add(unk_token)
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
             oov_count = sum(
                 1
                 for token_id, token in zip(tokenization.token_ids, tokenization.tokens)
@@ -52,16 +52,18 @@ class OOVRateTest(BaseTestDriver):
             )
             oov_rate = None if tokenization.token_count == 0 else oov_count / tokenization.token_count
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "oov_count": oov_count,
                         "oov_rate": oov_rate,
                     },
-                    artifacts={"text": record.text, "tokens": tokenization.tokens},
+                    tokenization=tokenization,
+                    output_metadata={
+                        "unknown_token_ids": sorted(unknown_token_ids),
+                        "unknown_tokens": sorted(unknown_tokens),
+                    },
                 )
             )
 

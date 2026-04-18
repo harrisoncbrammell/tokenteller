@@ -1,7 +1,19 @@
 from __future__ import annotations
 
-from .types import TestRunReport
-from ..testsuites.base import BaseTestDriver
+import os
+import sys
+
+if __package__ in {None, ""}:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if sys.path and os.path.abspath(sys.path[0]) == script_dir:
+        sys.path.pop(0)
+    src_root = os.path.dirname(os.path.dirname(script_dir))
+    sys.path.insert(0, src_root)
+    from tokenteller.core.types import TestRunReport
+    from tokenteller.testsuites.base import BaseTestDriver
+else:
+    from .types import TestRunReport
+    from ..testsuites.base import BaseTestDriver
 
 
 class Experiment:

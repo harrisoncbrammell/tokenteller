@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from ..drivers.models.base import BaseModelDriver
 from .base import BaseTestDriver
@@ -32,25 +32,23 @@ class NSLTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
-            baseline_tokenization = self.baseline_model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
+            baseline_tokenization = self.baseline_model.tokenize(record.text)
             baseline_count = baseline_tokenization.token_count
             nsl = None if baseline_count == 0 else tokenization.token_count / baseline_count
 
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "baseline_token_count": baseline_count,
                         "nsl": nsl,
                     },
-                    artifacts={
-                        "text": record.text,
-                        "tokens": tokenization.tokens,
-                        "baseline_tokens": baseline_tokenization.tokens,
+                    tokenization=tokenization,
+                    output_metadata={
+                        "baseline_model": self.baseline_model.name,
+                        "baseline_tokenizer_metadata": dict(getattr(baseline_tokenization, "raw", {})),
                     },
                 )
             )

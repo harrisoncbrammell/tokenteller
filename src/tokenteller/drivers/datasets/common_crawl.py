@@ -48,6 +48,12 @@ class CommonCrawlDatasetDriver(BaseDatasetDriver):
         self.fetcher = fetcher or self._build_fetcher()
 
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
+        cached_records = self._get_cached_records(query)
+        if cached_records is not None:
+            for record in cached_records:
+                yield record
+            return
+
         filters = query.filters
         if "url_pattern" in filters:
             target = str(filters["url_pattern"])
@@ -100,6 +106,7 @@ class CommonCrawlDatasetDriver(BaseDatasetDriver):
         if query.limit is not None:
             records = records[: query.limit]
 
+        self._store_cached_records(query, records)
         for record in records:
             yield record
 

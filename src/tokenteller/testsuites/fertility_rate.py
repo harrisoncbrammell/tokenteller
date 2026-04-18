@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from ..core.types import DatasetQuery, TestCaseResult
+from ..core.types import DatasetQuery
 from ..drivers.datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
@@ -31,20 +31,18 @@ class FertilityRateTest(BaseTestDriver):
             return
 
         for record in records:
-            tokenization = self.model.encode(record.text)
+            tokenization = self.model.tokenize(record.text)
             word_count = len(re.findall(r"\S+", record.text))
             fertility_rate = None if word_count == 0 else tokenization.token_count / word_count
             self.results.append(
-                TestCaseResult(
-                    record_id=record.id,
-                    tokenizer_name=self.model.name,
-                    test_name=self.name(),
+                self.make_result(
+                    record,
                     metrics={
                         "token_count": tokenization.token_count,
                         "word_count": word_count,
                         "fertility_rate": fertility_rate,
                     },
-                    artifacts={"text": record.text, "tokens": tokenization.tokens},
+                    tokenization=tokenization,
                 )
             )
 
