@@ -1,14 +1,13 @@
-"""Model driver folder.
+#model driver folder
+#add one python file per model driver here
 
-Add one Python file per model driver here.
-"""
 
-# Re-export the model base class and concrete drivers.
+# reexport the model base class and concrete drivers
 from .base import BaseModelDriver, BaseTokenizerDriver
 from .huggingface import HuggingFaceTokenizerDriver
 from .sentencepiece import SentencePieceModelDriver
 
-# Keep model-driver imports short for teammates.
+# keep model-driver imports short for teammates
 __all__ = [
     "BaseModelDriver",
     "BaseTokenizerDriver",

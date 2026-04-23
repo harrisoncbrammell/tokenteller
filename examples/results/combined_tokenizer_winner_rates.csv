@@ -1,0 +1,13 @@
+dataset,tokenizer_name,winning_records,total_records,win_rate
+Wikipedia,gpt2,2,100,0.02
+Wikipedia,llama-sp,0,100,0.0
+Wikipedia,t5,0,100,0.0
+Wikipedia,wordpiece,98,100,0.98
+Common Crawl,gpt2,31,100,0.31
+Common Crawl,llama-sp,2,100,0.02
+Common Crawl,t5,0,100,0.0
+Common Crawl,wordpiece,67,100,0.67
+OpenSubtitles,gpt2,88,100,0.88
+OpenSubtitles,llama-sp,2,100,0.02
+OpenSubtitles,t5,1,100,0.01
+OpenSubtitles,wordpiece,9,100,0.09

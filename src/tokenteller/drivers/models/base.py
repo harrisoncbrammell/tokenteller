@@ -13,7 +13,7 @@ class BaseModelDriver(ABC):
 
     @abstractmethod
     def encode(self, text: str) -> TokenizationResult:
-        """Turn one input string into a shared tokenization result."""
+        # turn one input string into a shared tokenization result
         raise NotImplementedError
 
     def decode(self, token_ids: list[int]) -> str:
