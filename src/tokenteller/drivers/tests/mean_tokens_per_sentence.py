@@ -1,28 +1,26 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+import re
+
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
-class CostEstimateTest(BaseTestDriver):
-    """Estimate token cost using a fixed per-1k-token price."""
-
+class MeanTokensPerSentenceTest(BaseTestDriver):
     def __init__(
         self,
         model,
         dataset: BaseDatasetDriver,
-        cost_per_1k_tokens: float,
         query: DatasetQuery | None = None,
         label: str | None = None,
     ):
         super().__init__(model=model, label=label)
         self.dataset = dataset
-        self.cost_per_1k_tokens = cost_per_1k_tokens
         self.query = query or DatasetQuery()
 
     def name(self) -> str:
-        return "cost"
+        return "mean_tokens_per_sentence"
 
     def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
@@ -32,18 +30,21 @@ class CostEstimateTest(BaseTestDriver):
 
         for record in records:
             tokenization = self.model.tokenize(record.text)
-            estimated_cost = tokenization.token_count / 1000.0 * self.cost_per_1k_tokens
+            sentence_count = _sentence_count(record.text)
+            mean_tokens = None if sentence_count == 0 else tokenization.token_count / sentence_count
             self.results.append(
                 self.make_result(
                     record,
                     metrics={
                         "token_count": tokenization.token_count,
-                        "estimated_cost": estimated_cost,
+                        "sentence_count": sentence_count,
+                        "mean_tokens_per_sentence": mean_tokens,
                     },
                     tokenization=tokenization,
                 )
             )
 
+        valid = [result.metrics["mean_tokens_per_sentence"] for result in self.results if result.metrics["mean_tokens_per_sentence"] is not None]
         self.summary = [
             {
                 "test": self.label,
@@ -51,8 +52,11 @@ class CostEstimateTest(BaseTestDriver):
                 "model": self.model.name,
                 "tokenizer": self.model.name,
                 "status": "completed",
-                "token_count": sum(result.metrics["token_count"] for result in self.results) / len(self.results),
-                "cost_per_1k_tokens": self.cost_per_1k_tokens,
-                "estimated_cost": sum(result.metrics["estimated_cost"] for result in self.results),
+                "mean_tokens_per_sentence": sum(valid) / len(valid) if valid else None,
             }
         ]
+
+
+def _sentence_count(text: str) -> int:
+    parts = [part.strip() for part in re.split(r"[.!?]+", text) if part.strip()]
+    return len(parts)

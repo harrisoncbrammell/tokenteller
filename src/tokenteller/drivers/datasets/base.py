@@ -8,13 +8,11 @@ from ...core.types import DatasetQuery, DatasetRecord
 
 class BaseDatasetDriver(ABC):
     def __init__(self, name: str):
-        # Every dataset gets a short stable name for experiment setup.
         self.name = name
         self._records_cache: dict[tuple[object, ...], list[DatasetRecord]] = {}
 
     @abstractmethod
     def iter_records(self, query: DatasetQuery) -> Iterable[DatasetRecord]:
-        """Yield dataset records that match the query."""
         raise NotImplementedError
 
     def _query_cache_key(self, query: DatasetQuery) -> tuple[object, ...]:

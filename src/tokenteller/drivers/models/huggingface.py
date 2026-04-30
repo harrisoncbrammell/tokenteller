@@ -40,6 +40,7 @@ class HuggingFaceTokenizerDriver(BaseModelDriver):
             text,
             add_special_tokens=False,
             return_offsets_mapping=with_offsets,
+            verbose=False,
         )
         token_ids = list(encoded["input_ids"])
         tokens = self.tokenizer.convert_ids_to_tokens(token_ids)

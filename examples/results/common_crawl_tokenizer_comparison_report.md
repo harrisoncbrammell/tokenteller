@@ -7,9 +7,9 @@
 - **Text field**: `text`
 - **Record type**: one cleaned Common Crawl document from the C4 dataset, using the document text field.
 - **Sampling method**: bounded random sample.
-- **Pool size**: first 10000 streamed documents
-- **Sample size**: 100 random documents
-- **How records were chosen**: we first streamed the first 10000 documents from the dataset, then used a fixed random seed (`38192`) to select 100 documents from that pooled set.
+- **Pool size**: first 10000 streamed records
+- **Sample size**: 100 random records
+- **How records were chosen**: we first streamed the first 10000 rows from the dataset, then used a fixed random seed (`38192`) to select 100 records from that pooled set.
 
 ## Test summary
 
@@ -27,7 +27,7 @@
 - **OOV rate**: Average share of tokens treated as unknown or out-of-vocabulary by the tokenizer.
 - **Fertility rate**: Average number of tokens generated per word.
 - **Mean tokens per sentence**: Average token count per sentence across the sampled Common Crawl documents.
-- **Word Count**: Metric reported by the test summary.
+- **Word Count**: extra value from the test summary
 - **Pieces per word**: Average number of subword pieces used to represent each word.
 - **Max pieces per word**: Largest number of pieces used for any single word seen in the sampled Common Crawl documents.
 - **Estimated cost**: Estimated tokenization cost across the sampled documents using the example price per 1,000 tokens.

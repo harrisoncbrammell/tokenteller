@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import re
-
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
-class MeanTokensPerSentenceTest(BaseTestDriver):
-    """Compute mean tokens per sentence from total tokens / total sentences."""
-
+class CompressionRatioTest(BaseTestDriver):
     def __init__(
         self,
         model,
@@ -22,7 +18,7 @@ class MeanTokensPerSentenceTest(BaseTestDriver):
         self.query = query or DatasetQuery()
 
     def name(self) -> str:
-        return "mean_tokens_per_sentence"
+        return "compression_ratio"
 
     def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
@@ -32,21 +28,21 @@ class MeanTokensPerSentenceTest(BaseTestDriver):
 
         for record in records:
             tokenization = self.model.tokenize(record.text)
-            sentence_count = _sentence_count(record.text)
-            mean_tokens = None if sentence_count == 0 else tokenization.token_count / sentence_count
+            char_count = len(record.text)
+            compression_ratio = None if char_count == 0 else tokenization.token_count / char_count
             self.results.append(
                 self.make_result(
                     record,
                     metrics={
                         "token_count": tokenization.token_count,
-                        "sentence_count": sentence_count,
-                        "mean_tokens_per_sentence": mean_tokens,
+                        "char_count": char_count,
+                        "compression_ratio": compression_ratio,
                     },
                     tokenization=tokenization,
                 )
             )
 
-        valid = [result.metrics["mean_tokens_per_sentence"] for result in self.results if result.metrics["mean_tokens_per_sentence"] is not None]
+        valid = [result.metrics["compression_ratio"] for result in self.results if result.metrics["compression_ratio"] is not None]
         self.summary = [
             {
                 "test": self.label,
@@ -54,11 +50,6 @@ class MeanTokensPerSentenceTest(BaseTestDriver):
                 "model": self.model.name,
                 "tokenizer": self.model.name,
                 "status": "completed",
-                "mean_tokens_per_sentence": sum(valid) / len(valid) if valid else None,
+                "compression_ratio": sum(valid) / len(valid) if valid else None,
             }
         ]
-
-
-def _sentence_count(text: str) -> int:
-    parts = [part.strip() for part in re.split(r"[.!?]+", text) if part.strip()]
-    return len(parts)

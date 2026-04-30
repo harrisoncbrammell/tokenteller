@@ -1,0 +1,14 @@
+setuptools>=68
+wheel
+datasets>=2.0
+tqdm>=4.66
+transformers>=4.0
+huggingface-hub>=0.20
+tokenizers>=0.15
+safetensors>=0.4
+sentencepiece>=0.2
+pyarrow>=14.0
+pandas>=2.0
+matplotlib>=3.8
+cdx-toolkit>=0.9.38
+pytest>=8.0

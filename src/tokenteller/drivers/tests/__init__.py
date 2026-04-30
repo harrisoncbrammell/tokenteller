@@ -1,4 +1,3 @@
-# Re-export the built-in tests and the test template.
 from .base import BaseTestDriver
 from .compression_ratio import CompressionRatioTest
 from .cost_estimate import CostEstimateTest
@@ -9,7 +8,6 @@ from .nsl import NSLTest
 from .oov_rate import OOVRateTest
 from .token_count import TokenCountTest
 
-# Keep the testsuite namespace focused on reusable test objects.
 __all__ = [
     "BaseTestDriver",
     "CompressionRatioTest",

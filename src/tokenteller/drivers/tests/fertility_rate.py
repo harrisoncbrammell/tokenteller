@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+import re
+
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
-class CompressionRatioTest(BaseTestDriver):
-    """Compute compression ratio T / C from token count and character count."""
-
+class FertilityRateTest(BaseTestDriver):
     def __init__(
         self,
         model,
@@ -20,7 +20,7 @@ class CompressionRatioTest(BaseTestDriver):
         self.query = query or DatasetQuery()
 
     def name(self) -> str:
-        return "compression_ratio"
+        return "fertility_rate"
 
     def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
@@ -30,21 +30,21 @@ class CompressionRatioTest(BaseTestDriver):
 
         for record in records:
             tokenization = self.model.tokenize(record.text)
-            char_count = len(record.text)
-            compression_ratio = None if char_count == 0 else tokenization.token_count / char_count
+            word_count = len(re.findall(r"\S+", record.text))
+            fertility_rate = None if word_count == 0 else tokenization.token_count / word_count
             self.results.append(
                 self.make_result(
                     record,
                     metrics={
                         "token_count": tokenization.token_count,
-                        "char_count": char_count,
-                        "compression_ratio": compression_ratio,
+                        "word_count": word_count,
+                        "fertility_rate": fertility_rate,
                     },
                     tokenization=tokenization,
                 )
             )
 
-        valid = [result.metrics["compression_ratio"] for result in self.results if result.metrics["compression_ratio"] is not None]
+        valid = [result.metrics["fertility_rate"] for result in self.results if result.metrics["fertility_rate"] is not None]
         self.summary = [
             {
                 "test": self.label,
@@ -52,6 +52,6 @@ class CompressionRatioTest(BaseTestDriver):
                 "model": self.model.name,
                 "tokenizer": self.model.name,
                 "status": "completed",
-                "compression_ratio": sum(valid) / len(valid) if valid else None,
+                "fertility_rate": sum(valid) / len(valid) if valid else None,
             }
         ]

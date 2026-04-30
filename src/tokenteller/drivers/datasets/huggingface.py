@@ -94,7 +94,7 @@ class HuggingFaceDatasetDriver(BaseDatasetDriver):
                     yield record
                 return
 
-            # Reservoir sample to keep memory bounded for streaming datasets.
+            # use reservoir sampling
             reservoir: list[DatasetRecord] = []
             for seen, record in enumerate(filtered_records, start=1):
                 if seen <= limit:

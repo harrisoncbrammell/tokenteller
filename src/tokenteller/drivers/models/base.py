@@ -8,16 +8,14 @@ from ...core.types import TokenizationResult
 
 class BaseModelDriver(ABC):
     def __init__(self, name: str):
-         self.name = name
-         self._tokenization_cache: dict[tuple[str, bool], TokenizationResult] = {}
+        self.name = name
+        self._tokenization_cache: dict[tuple[str, bool], TokenizationResult] = {}
 
     @abstractmethod
     def encode(self, text: str) -> TokenizationResult:
-        # turn one input string into a shared tokenization result
         raise NotImplementedError
 
     def decode(self, token_ids: list[int]) -> str:
-        # decode tokens to text if supported
         raise NotImplementedError("This model driver does not implement decode().")
 
     def tokenize(self, text: str, *, with_offsets: bool = False) -> TokenizationResult:
@@ -31,7 +29,6 @@ class BaseModelDriver(ABC):
         return tokenization
 
     def batch_encode(self, texts: Sequence[str]) -> list[TokenizationResult]:
-        # special batch encode api if model has one
         return [self.tokenize(text) for text in texts]
 
     def token_count(self, text: str) -> int:

@@ -1,16 +1,10 @@
-#driver package
+from .datasets.base import BaseDatasetDriver
+from .models.base import BaseModelDriver, BaseTokenizerDriver
+from .tests.base import BaseTestDriver
 
-#concrete model drivers belong in ``tokenteller.drivers.models``.
-#concrete dataset drivers belong in ``tokenteller.drivers.datasets``.
-
-
-# reexport the main driver base classes
-from .datasets import BaseDatasetDriver
-from .models import BaseModelDriver, BaseTokenizerDriver
-
-# keep the driver package namespace short and predictable
 __all__ = [
     "BaseDatasetDriver",
     "BaseModelDriver",
+    "BaseTestDriver",
     "BaseTokenizerDriver",
 ]

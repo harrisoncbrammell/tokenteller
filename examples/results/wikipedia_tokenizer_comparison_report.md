@@ -1,11 +1,15 @@
-# Hugging Face tokenizer comparison on 1,000 random Wikipedia articles
+# Hugging Face tokenizer comparison on random Wikipedia articles
 
 ## Sample
 
 - **Dataset**: `wikimedia/wikipedia`
 - **Subset**: `20231101.en`
-- **Pool size**: first 10000 streamed articles
-- **Sample size**: 100 random articles
+- **Text field**: `text`
+- **Record type**: one Wikipedia article from the dataset.
+- **Sampling method**: bounded random sample.
+- **Pool size**: first 10000 streamed records
+- **Sample size**: 100 random records
+- **How records were chosen**: we first streamed the first 10000 rows from the dataset, then used a fixed random seed (`123124`) to select 100 records from that pooled set.
 
 ## Test summary
 
@@ -23,7 +27,7 @@
 - **OOV rate**: Average share of tokens treated as unknown or out-of-vocabulary by the tokenizer.
 - **Fertility rate**: Average number of tokens generated per word.
 - **Mean tokens per sentence**: Average token count per sentence across the sampled articles.
-- **Word Count**: Metric reported by the test summary.
+- **Word Count**: extra value from the test summary
 - **Pieces per word**: Average number of subword pieces used to represent each word.
 - **Max pieces per word**: Largest number of pieces used for any single word seen in the sampled articles.
 - **Estimated cost**: Estimated tokenization cost across the sampled articles using the example price per 1,000 tokens.

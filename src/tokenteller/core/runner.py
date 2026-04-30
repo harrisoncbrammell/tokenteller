@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import sys
 
+from tqdm.auto import tqdm
+
 if __package__ in {None, ""}:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     if sys.path and os.path.abspath(sys.path[0]) == script_dir:
@@ -10,10 +12,10 @@ if __package__ in {None, ""}:
     src_root = os.path.dirname(os.path.dirname(script_dir))
     sys.path.insert(0, src_root)
     from tokenteller.core.types import TestRunReport
-    from tokenteller.testsuites.base import BaseTestDriver
+    from tokenteller.drivers.tests.base import BaseTestDriver
 else:
     from .types import TestRunReport
-    from ..testsuites.base import BaseTestDriver
+    from ..drivers.tests.base import BaseTestDriver
 
 
 class Experiment:
@@ -25,14 +27,13 @@ class Experiment:
         return self
 
     def run(self) -> TestRunReport:
-        """Run all configured tests and collect their saved output."""
         if not self.tests:
             raise ValueError("Experiment.run() requires at least one test.")
 
         summary: list[dict[str, object]] = []
         results = []
         warnings: list[str] = []
-        for test in self.tests:
+        for test in tqdm(self.tests, desc="running tests", unit="test"):
             test.status = "not_run"
             test.results = []
             test.summary = []

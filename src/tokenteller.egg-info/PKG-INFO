@@ -33,7 +33,7 @@ from my_project.my_dataset_driver import MyDatasetDriver
 from my_project.my_model_driver import MyModelDriver
 from tokenteller import Experiment
 from tokenteller.core.types import DatasetQuery, DatasetRecord, TestCaseResult
-from tokenteller.testsuites.base import BaseTestDriver
+from tokenteller.drivers.tests.base import BaseTestDriver
 
 class EnglishTokenCountTest(BaseTestDriver):
     def __init__(self, model, label: str | None = None):

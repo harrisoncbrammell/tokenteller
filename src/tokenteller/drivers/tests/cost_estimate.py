@@ -1,28 +1,26 @@
 from __future__ import annotations
 
-import re
-
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
-class FertilityRateTest(BaseTestDriver):
-    """Compute fertility rate T / W from token count and word count."""
-
+class CostEstimateTest(BaseTestDriver):
     def __init__(
         self,
         model,
         dataset: BaseDatasetDriver,
+        cost_per_1k_tokens: float,
         query: DatasetQuery | None = None,
         label: str | None = None,
     ):
         super().__init__(model=model, label=label)
         self.dataset = dataset
+        self.cost_per_1k_tokens = cost_per_1k_tokens
         self.query = query or DatasetQuery()
 
     def name(self) -> str:
-        return "fertility_rate"
+        return "cost"
 
     def run(self) -> None:
         records = list(self.dataset.iter_records(self.query))
@@ -32,21 +30,18 @@ class FertilityRateTest(BaseTestDriver):
 
         for record in records:
             tokenization = self.model.tokenize(record.text)
-            word_count = len(re.findall(r"\S+", record.text))
-            fertility_rate = None if word_count == 0 else tokenization.token_count / word_count
+            estimated_cost = tokenization.token_count / 1000.0 * self.cost_per_1k_tokens
             self.results.append(
                 self.make_result(
                     record,
                     metrics={
                         "token_count": tokenization.token_count,
-                        "word_count": word_count,
-                        "fertility_rate": fertility_rate,
+                        "estimated_cost": estimated_cost,
                     },
                     tokenization=tokenization,
                 )
             )
 
-        valid = [result.metrics["fertility_rate"] for result in self.results if result.metrics["fertility_rate"] is not None]
         self.summary = [
             {
                 "test": self.label,
@@ -54,6 +49,8 @@ class FertilityRateTest(BaseTestDriver):
                 "model": self.model.name,
                 "tokenizer": self.model.name,
                 "status": "completed",
-                "fertility_rate": sum(valid) / len(valid) if valid else None,
+                "token_count": sum(result.metrics["token_count"] for result in self.results) / len(self.results),
+                "cost_per_1k_tokens": self.cost_per_1k_tokens,
+                "estimated_cost": sum(result.metrics["estimated_cost"] for result in self.results),
             }
         ]

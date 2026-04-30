@@ -3,15 +3,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
-from ..core.utils import render_table
+from ...core.types import DatasetQuery
+from ...core.utils import render_table
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
 class FragmentationTest(BaseTestDriver):
-    """Measure how much a tokenizer splits words into smaller pieces."""
-
     def __init__(
         self,
         model,

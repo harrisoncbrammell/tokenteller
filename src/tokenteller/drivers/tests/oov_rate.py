@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
 class OOVRateTest(BaseTestDriver):
-    """Compute OOV rate U / T using model-specific or user-supplied unk markers."""
-
     def __init__(
         self,
         model,

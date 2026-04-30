@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from ..core.types import DatasetQuery
-from ..drivers.datasets.base import BaseDatasetDriver
+from ...core.types import DatasetQuery
+from ..datasets.base import BaseDatasetDriver
 from .base import BaseTestDriver
 
 
 class TokenCountTest(BaseTestDriver):
-    """Count tokens and keep the token split for each record."""
-
     def __init__(
         self,
         model,
